@@ -48,11 +48,18 @@
             <button onclick="guardarDatos()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
                 💾 Guardar
             </button>
+            <button onclick="actualizarDatosCentralizados(true)" class="bg-cyan-700 hover:bg-cyan-800 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
+                🔄 Actualizar datos
+            </button>
             <button onclick="compartirDashboardOutlook()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
                 ✉️ Compartir por Outlook
             </button>
         </div>
     </header>
+    <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1 items-center justify-between">
+        <span id="estadoActualizacion">Conectando con la fuente central de datos…</span>
+        <span>Actualización automática cada 5 minutos cuando el JSON esté publicado junto al dashboard.</span>
+    </div>
 
     <main class="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
 
@@ -237,35 +244,67 @@
             "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
         ];
 
-        window.onload = function() {
-            // Cargar datos centralizados compartidos si existen
-            fetch('datos_chep.json')
-                .then(res => {
-                    if (res.ok) return res.json();
-                    throw new Error('Sin archivo compartido');
-                })
-                .then(data => {
-                    if (data && data.f1 && data.f2) {
-                        dataF1 = data.f1;
-                        dataF2 = data.f2;
-                        document.getElementById('statusMemoria').innerText = "✔ Datos sincronizados desde el servidor central GitHub.";
-                        extraerFiltros(true);
-                    }
-                })
-                .catch(() => {
-                    // Fallback a localStorage local si no hay JSON centralizado
-                    const savedF1 = localStorage.getItem('chep_f1');
-                    const savedF2 = localStorage.getItem('chep_f2');
-                    if (savedF1 && savedF2) {
-                        try {
-                            dataF1 = JSON.parse(savedF1);
-                            dataF2 = JSON.parse(savedF2);
-                            document.getElementById('statusMemoria').innerText = "✔ Datos cargados de memoria local.";
-                            extraerFiltros(true);
-                        } catch(e) { console.error(e); }
-                    }
-                });
+        // CONFIGURACIÓN DE DATOS:
+        // Si el JSON está publicado en otra URL, reemplaza './datos_chep.json' por su URL HTTPS.
+        // La URL debe permitir que el navegador la lea (mismo origen o CORS autorizado).
+        const CONFIG_DATOS = {
+            url: './datos_chep.json',
+            intervaloMs: 5 * 60 * 1000
         };
+        let ultimaCargaCentral = null;
+        let cargaCentralEnCurso = false;
+
+        window.onload = async function() {
+            await actualizarDatosCentralizados(false);
+            // Actualiza periódicamente mientras el dashboard permanezca abierto.
+            window.setInterval(() => actualizarDatosCentralizados(false), CONFIG_DATOS.intervaloMs);
+        };
+
+        async function actualizarDatosCentralizados(mostrarAviso = false) {
+            if (cargaCentralEnCurso) return;
+            cargaCentralEnCurso = true;
+            const estado = document.getElementById('estadoActualizacion');
+            if (estado) estado.innerText = 'Consultando la fuente central de datos…';
+            try {
+                const separador = CONFIG_DATOS.url.includes('?') ? '&' : '?';
+                const respuesta = await fetch(CONFIG_DATOS.url + separador + '_=' + Date.now(), {
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                });
+                if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
+                const data = await respuesta.json();
+                if (!data || !Array.isArray(data.f1) || !Array.isArray(data.f2)) {
+                    throw new Error('El JSON debe contener arreglos "f1" y "f2".');
+                }
+                dataF1 = data.f1;
+                dataF2 = data.f2;
+                dataF1.forEach(r => { if (r.SEMANA !== undefined) r.SEMANA = limpiarSemana(r.SEMANA); });
+                dataF2.forEach(r => { if (r.SEMANA !== undefined) r.SEMANA = limpiarSemana(r.SEMANA); });
+                localStorage.setItem('chep_f1', JSON.stringify(dataF1));
+                localStorage.setItem('chep_f2', JSON.stringify(dataF2));
+                ultimaCargaCentral = new Date();
+                document.getElementById('statusMemoria').innerText = '✔ Datos cargados desde la fuente central.';
+                if (estado) estado.innerText = 'Datos centrales actualizados: ' + ultimaCargaCentral.toLocaleString('es-MX');
+                extraerFiltros(true);
+                if (mostrarAviso) mostrarNotificacion('Los datos se cargaron correctamente desde la fuente central.', 'Actualización completada');
+            } catch (err) {
+                // No se sustituyen los datos por ceros: se conservan los últimos datos válidos.
+                const savedF1 = localStorage.getItem('chep_f1');
+                const savedF2 = localStorage.getItem('chep_f2');
+                if (dataF1.length === 0 && savedF1 && savedF2) {
+                    try {
+                        dataF1 = JSON.parse(savedF1);
+                        dataF2 = JSON.parse(savedF2);
+                        extraerFiltros(true);
+                    } catch (e) { console.error(e); }
+                }
+                if (estado) estado.innerText = 'No se pudo consultar la fuente central. ' + (ultimaCargaCentral ? 'Se conservan los últimos datos cargados el ' + ultimaCargaCentral.toLocaleString('es-MX') : 'Se intentará usar la copia local disponible.') + ' Detalle: ' + err.message;
+                if (mostrarAviso) mostrarNotificacion('No fue posible actualizar desde la fuente central. Verifica la URL, permisos y que el servidor permita leer el JSON. ' + err.message, 'No se pudo actualizar');
+                console.warn('Actualización central fallida:', err);
+            } finally {
+                cargaCentralEnCurso = false;
+            }
+        }
 
         function toggleAdminPanel() {
             const panel = document.getElementById('panelAdmin');
@@ -358,7 +397,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
 
-                mostrarNotificacion("Se ha descargado 'datos_chep.json'. Súbelo a tu repositorio de GitHub para que todos los usuarios vean esta información actualizada.", "Guardado Centralizado");
+                mostrarNotificacion("Se ha descargado 'datos_chep.json'. Publica este archivo JSON en la misma ubicación web que el dashboard (o configura CONFIG_DATOS.url con la URL HTTPS accesible) para que los usuarios puedan cargar los datos compartidos.", "Guardado Centralizado");
             } else {
                 mostrarNotificacion("No hay datos cargados para guardar.", "Advertencia");
             }
@@ -488,7 +527,7 @@
 
                 if(!detalleF1[key]) detalleF1[key] = { anio, sem, fact: 0, mov: 0 };
                 detalleF1[key].fact += total;
-                if(String(row.CONCEPTO||'').toUpperCase().includes('CARGO CANAL')) {
+                if(/\bCARGO\s+CANAL\b/i.test(String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim())) {
                     detalleF1[key].mov += mov;
                 }
             });
