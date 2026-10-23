@@ -52,14 +52,11 @@
                 🔄 Actualizar datos
             </button>
             <button onclick="compartirDashboardOutlook()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
-                ✉️ Compartir por Outlook
+                ✉️ Compartir
             </button>
         </div>
     </header>
-    <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1 items-center justify-between">
-        <span id="estadoActualizacion">Conectando con la fuente central de datos…</span>
-        <span>Actualización automática cada 5 minutos cuando el JSON esté publicado junto al dashboard.</span>
-    </div>
+    <div class="hidden" aria-hidden="true"><span id="estadoActualizacion"></span></div>
 
     <main class="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
 
@@ -110,7 +107,7 @@
         </div>
 
         <!-- KPIs Principales -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
             <div class="bg-white p-3.5 rounded-xl border-l-4 border-blue-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
                 <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Facturación Total</p>
                 <div id="kpiFacturacion" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
@@ -124,17 +121,54 @@
                 <div id="kpiReqPlanta" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
             <div class="bg-white p-3.5 rounded-xl border-l-4 border-amber-500 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">OCUPAN vs REAL</p>
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">CUMPLIDOS. PROY. vs REALES</p>
                 <div id="kpiOcupanReal" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
             <div class="bg-white p-3.5 rounded-xl border-l-4 border-emerald-500 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">RETORNO</p>
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">RETORNO TARIMA</p>
                 <div id="kpiRetorno" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
+            </div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-fuchsia-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">PEDIDOS CHEP</p>
+                <div id="kpiPedidosChep" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
             <div class="bg-white p-3.5 rounded-xl border-l-4 border-purple-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
                 <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SEMANAS</p>
                 <div id="kpiSemanasCount" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
+        </div>
+
+        <!-- Resumen de variaciones y equivalencias CHEP -->
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+            <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 xl:col-span-2">
+                <div class="border-b border-slate-100 pb-2 mb-3">
+                    <h2 class="text-sm font-bold text-slate-800">RESUMEN</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-slate-900 text-white">
+                            <tr>
+                                <th class="p-2.5">Indicador</th>
+                                <th id="thResumenAnterior" class="p-2.5 text-right">VALOR (año anterior)</th>
+                                <th id="thResumenActual" class="p-2.5 text-right">VALOR (año actual)</th>
+                                <th class="p-2.5 text-right">Variación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaResumenBody" class="divide-y divide-slate-100">
+                            <tr><td colspan="4" class="p-4 text-center text-slate-400">Selecciona filtros para generar el resumen.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
+                <div class="border-b border-slate-100 pb-2 mb-3">
+                    <h2 class="text-sm font-bold text-slate-800">PEDIDOS/CARGAS CHEP</h2>
+                    <p class="text-xs text-slate-500 mt-1">Equivalencia estimada con estándar de 504 tarimas.</p>
+                </div>
+                <div id="resumenPedidosCargas" class="space-y-3">
+                    <div class="text-xs text-slate-400">Selecciona filtros para calcular equivalencias.</div>
+                </div>
+            </section>
         </div>
 
         <!-- Gráficas Principales -->
@@ -248,16 +282,14 @@
         // Si el JSON está publicado en otra URL, reemplaza './datos_chep.json' por su URL HTTPS.
         // La URL debe permitir que el navegador la lea (mismo origen o CORS autorizado).
         const CONFIG_DATOS = {
-            url: './datos_chep.json',
-            intervaloMs: 5 * 60 * 1000
+            url: './datos_chep.json'
         };
         let ultimaCargaCentral = null;
         let cargaCentralEnCurso = false;
 
         window.onload = async function() {
+            // Carga los datos una sola vez al entrar. Las actualizaciones posteriores son manuales.
             await actualizarDatosCentralizados(false);
-            // Actualiza periódicamente mientras el dashboard permanezca abierto.
-            window.setInterval(() => actualizarDatosCentralizados(false), CONFIG_DATOS.intervaloMs);
         };
 
         async function actualizarDatosCentralizados(mostrarAviso = false) {
@@ -285,7 +317,7 @@
                 ultimaCargaCentral = new Date();
                 document.getElementById('statusMemoria').innerText = '✔ Datos cargados desde la fuente central.';
                 if (estado) estado.innerText = 'Datos centrales actualizados: ' + ultimaCargaCentral.toLocaleString('es-MX');
-                extraerFiltros(true);
+                extraerFiltros(false);
                 if (mostrarAviso) mostrarNotificacion('Los datos se cargaron correctamente desde la fuente central.', 'Actualización completada');
             } catch (err) {
                 // No se sustituyen los datos por ceros: se conservan los últimos datos válidos.
@@ -295,7 +327,7 @@
                     try {
                         dataF1 = JSON.parse(savedF1);
                         dataF2 = JSON.parse(savedF2);
-                        extraerFiltros(true);
+                        extraerFiltros(false);
                     } catch (e) { console.error(e); }
                 }
                 if (estado) estado.innerText = 'No se pudo consultar la fuente central. ' + (ultimaCargaCentral ? 'Se conservan los últimos datos cargados el ' + ultimaCargaCentral.toLocaleString('es-MX') : 'Se intentará usar la copia local disponible.') + ' Detalle: ' + err.message;
@@ -525,8 +557,10 @@
                 const total = parseFloat(row.TOTAL) || 0;
                 const mov = parseFloat(row.MOV) || 0;
 
-                if(!detalleF1[key]) detalleF1[key] = { anio, sem, fact: 0, mov: 0 };
+                if(!detalleF1[key]) detalleF1[key] = { anio, sem, fact: 0, mov: 0, pedidosChep: 0 };
                 detalleF1[key].fact += total;
+                const conceptoNormalizado = String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                if (conceptoNormalizado.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) detalleF1[key].pedidosChep += total;
                 if(/\bCARGO\s+CANAL\b/i.test(String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim())) {
                     detalleF1[key].mov += mov;
                 }
@@ -546,14 +580,14 @@
 
             let keysUnidas = Array.from(new Set([...Object.keys(detalleF1), ...Object.keys(detalleF2)])).sort().reverse();
 
-            let htmlFact = '', htmlVol = '', htmlReq = '', htmlOcReal = '', htmlRet = '', htmlSem = '';
+            let htmlFact = '', htmlVol = '', htmlReq = '', htmlOcReal = '', htmlRet = '', htmlPedidosChep = '', htmlSem = '';
             let semanasUnicas = new Set();
 
             if(keysUnidas.length === 0 || (aniosSeleccionados.size === 0 && mesesSeleccionados.size === 0 && semanasSeleccionadas.size === 0)) {
-                htmlFact = htmlVol = htmlReq = htmlOcReal = htmlRet = htmlSem = '<span class="text-xs font-bold text-slate-400">Sin selección</span>';
+                htmlFact = htmlVol = htmlReq = htmlOcReal = htmlRet = htmlPedidosChep = htmlSem = '<span class="text-xs font-bold text-slate-400">Sin selección</span>';
             } else {
                 keysUnidas.forEach(k => {
-                    let f = detalleF1[k] || { fact: 0, mov: 0 };
+                    let f = detalleF1[k] || { fact: 0, mov: 0, pedidosChep: 0 };
                     let p = detalleF2[k] || { req: 0, oc: 0, real: 0, ret: 0 };
                     let partes = k.split(' - ');
                     let semLimpia = partes[1].replace('Sem ', '').trim();
@@ -565,11 +599,13 @@
                     htmlReq += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-cyan-700">${p.req.toLocaleString()}</span></div>`;
                     htmlOcReal += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-amber-700">${p.oc.toLocaleString()} / ${p.real.toLocaleString()}</span></div>`;
                     htmlRet += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-emerald-700">${p.ret.toLocaleString()}</span></div>`;
+                    htmlPedidosChep += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-fuchsia-700">$${f.pedidosChep.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>`;
 
                     ultimoKPIExportar.push({
                         Periodo: etiqueta,
                         "Facturación Total": f.fact,
                         "Volumen Cargo Canal": f.mov,
+                        "PEDIDOS CHEP": f.pedidosChep,
                         "REQ Planta": p.req,
                         "Ocupan": p.oc,
                         "Real": p.real,
@@ -584,7 +620,9 @@
             document.getElementById('kpiReqPlanta').innerHTML = htmlReq;
             document.getElementById('kpiOcupanReal').innerHTML = htmlOcReal;
             document.getElementById('kpiRetorno').innerHTML = htmlRet;
+            document.getElementById('kpiPedidosChep').innerHTML = htmlPedidosChep;
             document.getElementById('kpiSemanasCount').innerHTML = htmlSem;
+            renderizarResumen(f1, f2);
 
             let aniosActivos = Array.from(aniosSeleccionados).sort().reverse();
             let sumaAniosF1 = {};
@@ -595,6 +633,105 @@
 
             renderChartFacturacion(aniosActivos, aniosActivos.map(a => sumaAniosF1[a] || 0));
             renderChartPlanta(detalleF2);
+        }
+
+        function formatearCantidad(valor, moneda = false) {
+            const n = Number(valor) || 0;
+            return moneda
+                ? '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : n.toLocaleString('es-MX', { maximumFractionDigits: 2 });
+        }
+
+        function renderizarResumen(f1, f2) {
+            const tbody = document.getElementById('tablaResumenBody');
+            const equivalencias = document.getElementById('resumenPedidosCargas');
+            const sinFiltros = aniosSeleccionados.size === 0 && mesesSeleccionados.size === 0 && semanasSeleccionadas.size === 0;
+            if (sinFiltros) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">Selecciona uno o más filtros para generar el resumen.</td></tr>';
+                equivalencias.innerHTML = '<div class="text-xs text-slate-400">Selecciona filtros para calcular equivalencias.</div>';
+                document.getElementById('thResumenAnterior').innerText = 'VALOR (año anterior)';
+                document.getElementById('thResumenActual').innerText = 'VALOR (año actual)';
+                return;
+            }
+
+            const porAnio = {};
+            const asegurar = (anio) => {
+                if (!porAnio[anio]) porAnio[anio] = { fact: 0, cargo: 0, pedidosChep: 0, req: 0, retorno: 0 };
+                return porAnio[anio];
+            };
+            f1.forEach(row => {
+                const anio = String(row.AÑO || '').trim();
+                if (!anio) return;
+                const d = asegurar(anio);
+                d.fact += Number.parseFloat(row.TOTAL) || 0;
+                const concepto = String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                if (/\bCARGO\s+CANAL\b/.test(concepto) && !concepto.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) d.cargo += Number.parseFloat(row.MOV) || 0;
+                if (concepto.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) d.pedidosChep += Number.parseFloat(row.TOTAL) || 0;
+            });
+            f2.forEach(row => {
+                const anio = String(row.AÑO || '').trim();
+                if (!anio) return;
+                const d = asegurar(anio);
+                d.req += Number.parseFloat(row.REQ_PLANTA) || 0;
+                d.retorno += Number.parseFloat(row.RETORNO) || 0;
+            });
+
+            const anios = Object.keys(porAnio).filter(a => /^\d{4}$/.test(a)).sort((a, b) => Number(a) - Number(b));
+            const anioActual = anios[anios.length - 1];
+            const anioAnterior = anios[anios.length - 2];
+            document.getElementById('thResumenAnterior').innerText = `VALOR (${anioAnterior || 'año anterior'})`;
+            document.getElementById('thResumenActual').innerText = `VALOR (${anioActual || 'año actual'})`;
+            const filas = [];
+            const datosVariacion = {};
+            const agregarComparacionAnual = (nombre, campo, moneda = false) => {
+                if (!anioActual || !anioAnterior) {
+                    filas.push(`<tr><td class="p-2.5 font-semibold">${nombre}</td><td colspan="3" class="p-2.5 text-center text-slate-400">Selecciona datos de al menos dos años para comparar.</td></tr>`);
+                    datosVariacion[campo] = null;
+                    return;
+                }
+                const anterior = porAnio[anioAnterior][campo] || 0;
+                const actual = porAnio[anioActual][campo] || 0;
+                const diff = actual - anterior;
+                datosVariacion[campo] = { anterior, actual, diff };
+                const texto = diff > 0 ? 'Aumentó' : diff < 0 ? 'Disminuyó' : 'Sin cambio';
+                const clase = diff > 0 ? 'text-emerald-700' : diff < 0 ? 'text-rose-700' : 'text-slate-600';
+                filas.push(`<tr><td class="p-2.5 font-semibold">${nombre}</td><td class="p-2.5 text-right">${formatearCantidad(anterior, moneda)}</td><td class="p-2.5 text-right">${formatearCantidad(actual, moneda)}</td><td class="p-2.5 text-right font-bold ${clase}">${texto}: ${formatearCantidad(Math.abs(diff), moneda)}</td></tr>`);
+            };
+
+            agregarComparacionAnual('Facturación total', 'fact', true);
+            agregarComparacionAnual('Volumen Cargo Canal', 'cargo');
+            agregarComparacionAnual('REQ PLANTA', 'req');
+            agregarComparacionAnual('RETORNO TARIMA', 'retorno');
+            agregarComparacionAnual('PEDIDOS CHEP', 'pedidosChep', true);
+            tbody.innerHTML = filas.join('');
+
+            const estandar = 504;
+            const variacionRetorno = datosVariacion.retorno ? datosVariacion.retorno.diff : null;
+            const variacionPedidos = datosVariacion.pedidosChep ? datosVariacion.pedidosChep.diff : null;
+            const valoresCU = dataF1.map(row => {
+                const raw = row['C/U'] ?? row['C\u002fU'] ?? row['C U'];
+                const val = typeof raw === 'number' ? raw : Number(String(raw ?? '').replace(/[$,\s]/g, ''));
+                return Number.isFinite(val) ? val : NaN;
+            }).filter(v => Number.isFinite(v) && v > 0);
+            const valorMaximoCU = valoresCU.length ? Math.max(...valoresCU) : null;
+            const cargasPorRetorno = variacionRetorno === null ? null : Math.abs(variacionRetorno) / estandar;
+            const pedidosDivididosPorCU = (variacionPedidos === null || !valorMaximoCU) ? null : Math.abs(variacionPedidos) / valorMaximoCU;
+            const cargasPorPedidos = pedidosDivididosPorCU === null ? null : pedidosDivididosPorCU / estandar;
+            const formatoEquiv = v => v === null ? 'Sin datos suficientes' : `${v.toLocaleString('es-MX', { maximumFractionDigits: 2 })} cargas`;
+            const signoRetorno = variacionRetorno === null ? '' : (variacionRetorno < 0 ? 'Disminución' : variacionRetorno > 0 ? 'Aumento' : 'Sin cambio');
+            const signoPedidos = variacionPedidos === null ? '' : (variacionPedidos < 0 ? 'Disminución' : variacionPedidos > 0 ? 'Aumento' : 'Sin cambio');
+            equivalencias.innerHTML = `
+                <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+                    <p class="text-xs font-bold text-emerald-800">Equivalencia de RETORNO TARIMA</p>
+                    <p class="mt-1 text-[11px] text-slate-600">${signoRetorno}${variacionRetorno === null ? '' : ` de ${formatearCantidad(Math.abs(variacionRetorno))} tarimas ÷ 504`}</p>
+                    <p class="mt-1 text-xl font-extrabold text-emerald-700">${formatoEquiv(cargasPorRetorno)}</p>
+                </div>
+                <div class="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3">
+                    <p class="text-xs font-bold text-fuchsia-800">Equivalencia de PEDIDOS CHEP</p>
+                    <p class="mt-1 text-[11px] text-slate-600">${signoPedidos}${variacionPedidos === null ? '' : ` de ${formatearCantidad(Math.abs(variacionPedidos), true)} ÷ ${valorMaximoCU ? formatearCantidad(valorMaximoCU, true) : 'valor máximo C/U'} ÷ 504`}</p>
+                    <p class="mt-1 text-xl font-extrabold text-fuchsia-700">${formatoEquiv(cargasPorPedidos)}</p>
+                    <p class="mt-1 text-[10px] text-slate-500">Valor máximo C/U de la fuente 1: ${valorMaximoCU ? formatearCantidad(valorMaximoCU, true) : 'No disponible'}.</p>
+                </div>`;
         }
 
         function generarProyeccion() {
@@ -810,12 +947,12 @@
             let flechaReq = diffReq >= 0 ? '▲ Aumento' : '▼ Disminución';
             let flechaRet = diffRet >= 0 ? '▲ Aumento' : '▼ Disminución';
 
-            document.getElementById('subtextPlanta').innerText = `REQ PLANTA: ${flechaReq} de ${Math.abs(diffReq).toFixed(1)}% | RETORNO: ${flechaRet} de ${Math.abs(diffRet).toFixed(1)}% vs anterior.`;
+            document.getElementById('subtextPlanta').innerText = `REQ PLANTA: ${flechaReq} de ${Math.abs(diffReq).toFixed(1)}% | RETORNO TARIMA: ${flechaRet} de ${Math.abs(diffRet).toFixed(1)}% vs anterior.`;
 
             chartPlantaInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['REQ PLANTA', 'RETORNO'],
+                    labels: ['REQ PLANTA', 'RETORNO TARIMA'],
                     datasets: [
                         {
                             label: 'Año 2025',
