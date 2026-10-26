@@ -516,7 +516,6 @@
 
             if(!keys.length) { tbody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-slate-400">Sin datos</td></tr>'; return; }
 
-            // Proyección automática para semanas sin datos dentro del periodo
             let acumuladoFact = 0, contadorFact = 0;
             keys.forEach(k => {
                 if(map[k].f > 0) {
