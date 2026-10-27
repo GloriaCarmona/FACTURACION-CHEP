@@ -4,209 +4,214 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Ejecutivo CHEP & Operación Planta</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para gráficas -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS para exportar Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
-        body { user-select: none; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800" oncontextmenu="return false;">
 
-    <!-- Header -->
+    <!-- Header con Botones -->
     <header class="bg-slate-900 text-white p-3.5 shadow-md flex flex-wrap justify-between items-center gap-2 sticky top-0 z-50">
         <div>
             <h1 class="text-base font-bold text-blue-400">Dashboard Facturación CHEP & Planta</h1>
             <p class="text-[10px] text-slate-400">Control Operativo, Financiero y Proyecciones Inteligentes</p>
         </div>
         <div class="flex items-center space-x-2">
-            <button onclick="toggleAdminPanel()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-700 cursor-pointer">🔐 Admin Ficheros</button>
-            <button onclick="guardarDatos()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">💾 Guardar</button>
-            <button onclick="actualizarDatosCentralizados(true)" class="bg-cyan-700 hover:bg-cyan-800 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">🔄 Actualizar datos</button>
-            <button onclick="compartirDashboardOutlook()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">✉️ Compartir</button>
+            <button onclick="toggleAdminPanel()" class="bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs px-2.5 py-1.5 rounded-lg font-bold border border-slate-700 transition-all shadow-sm active:scale-95 cursor-pointer">
+                🔐 Admin Ficheros
+            </button>
+            <button onclick="guardarDatos()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
+                💾 Guardar
+            </button>
+            <button onclick="actualizarDatosCentralizados(true)" class="bg-cyan-700 hover:bg-cyan-800 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
+                🔄 Actualizar datos
+            </button>
+            <button onclick="compartirDashboardOutlook()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold transition-all shadow-sm active:scale-95 cursor-pointer">
+                ✉️ Compartir
+            </button>
         </div>
     </header>
+    <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1 items-center justify-between">
+        <span id="estadoActualizacion">Conectando con la fuente central de datos…</span>
+    </div>
 
     <main class="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
 
-        <!-- Panel Admin -->
+        <!-- Panel Admin Protegido -->
         <div id="panelAdmin" class="bg-amber-50 border border-amber-200 p-3.5 rounded-xl shadow-sm hidden">
             <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-amber-800 uppercase">Panel Administrador (Fuentes de Datos)</span>
-                <button onclick="toggleAdminPanel()" class="text-xs text-amber-900 font-bold px-2 py-0.5 rounded border border-amber-300 bg-amber-100 cursor-pointer">✕ Cerrar</button>
+                <span class="text-xs font-bold text-amber-800 uppercase tracking-wide">Panel Exclusivo de Administración (Fuentes de Datos)</span>
+                <button onclick="toggleAdminPanel()" class="text-xs text-amber-900 hover:text-amber-950 font-bold px-2 py-0.5 rounded border border-amber-300 bg-amber-100 hover:bg-amber-200 cursor-pointer">✕ Cerrar</button>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                <div class="bg-white p-2.5 rounded-lg border border-amber-200">
-                    <label class="block font-semibold mb-1">Fuente 1 (Facturas CHEP):</label>
-                    <input type="file" accept=".xlsx, .xls, .csv" class="text-xs cursor-pointer" onchange="cargarFuente1(this)">
+                <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-xs">
+                    <label class="block font-semibold text-slate-700 mb-1">Fuente 1 (Facturas CHEP):</label>
+                    <input type="file" id="inputFuente1" accept=".xlsx, .xls, .csv" class="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer" onchange="cargarFuente1(this)">
                 </div>
-                <div class="bg-white p-2.5 rounded-lg border border-amber-200">
-                    <label class="block font-semibold mb-1">Fuente 2 (CONSOLIDADOS INF):</label>
-                    <input type="file" accept=".xlsx, .xls, .csv" class="text-xs cursor-pointer" onchange="cargarFuente2(this)">
+                <div class="bg-white p-2.5 rounded-lg border border-amber-200 shadow-xs">
+                    <label class="block font-semibold text-slate-700 mb-1">Fuente 2 (CONSOLIDADOS INF):</label>
+                    <input type="file" id="inputFuente2" accept=".xlsx, .xls, .csv" class="text-xs text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer" onchange="cargarFuente2(this)">
                 </div>
             </div>
             <p id="statusMemoria" class="text-[11px] text-emerald-700 mt-2 font-medium"></p>
         </div>
 
-        <!-- KPI SEMANAS (Parte Superior) -->
-        <div class="bg-slate-900 text-white p-2.5 rounded-xl shadow-sm flex items-center justify-between px-4">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">SEMANAS ACTIVAS:</span>
-                <div id="kpiSemanasCount" class="text-xs font-extrabold text-white">Sin selección</div>
-            </div>
-            <span class="text-[10px] text-slate-400">Control de semanas seleccionadas</span>
-        </div>
-
-        <!-- Filtros de Análisis (Azul Cian) -->
+        <!-- Filtros en Cuadrícula y Botón Descargar Data -->
         <div class="bg-white p-4 rounded-xl shadow-xs border border-slate-200 space-y-3">
             <div class="flex flex-wrap justify-between items-center border-b border-slate-100 pb-2 gap-2">
-                <span class="text-xs font-bold text-slate-700 uppercase">Filtros de Análisis</span>
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wide">Filtros de Análisis</span>
                 <div class="flex items-center gap-2">
-                    <button onclick="descargarDataExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer">📥 Descargar Data</button>
+                    <button onclick="descargarDataExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer">
+                        📥 Descargar Data
+                    </button>
                     <button onclick="resetearFiltros()" class="text-[11px] text-blue-600 font-semibold hover:underline cursor-pointer">Limpiar Filtros</button>
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><label class="text-xs text-slate-500 block mb-1 font-bold">AÑO:</label><div id="gridAnios" class="grid grid-cols-2 gap-1.5 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div></div>
-                <div><label class="text-xs text-slate-500 block mb-1 font-bold">MES:</label><div id="gridMeses" class="grid grid-cols-3 gap-1.5 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div></div>
-                <div><label class="text-xs text-slate-500 block mb-1 font-bold">SEMANA:</label><div id="gridSemanas" class="grid grid-cols-4 gap-1 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div></div>
+                <div>
+                    <label class="text-xs text-slate-500 block mb-1 font-bold">AÑO:</label>
+                    <div id="gridAnios" class="grid grid-cols-2 gap-1.5 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 block mb-1 font-bold">MES:</label>
+                    <div id="gridMeses" class="grid grid-cols-3 gap-1.5 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div>
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 block mb-1 font-bold">SEMANA:</label>
+                    <div id="gridSemanas" class="grid grid-cols-4 gap-1 p-1.5 border border-slate-300 rounded-lg bg-slate-50 max-h-24 overflow-y-auto"></div>
+                </div>
             </div>
         </div>
 
         <!-- KPIs Principales -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-blue-600 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">Facturación Total</p>
-                <div id="kpiFacturacion" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-blue-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Facturación Total</p>
+                <div id="kpiFacturacion" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-indigo-900 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">Volumen Cargo Canal</p>
-                <div id="kpiVolumenCargo" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-indigo-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Volumen Cargo Canal</p>
+                <div id="kpiVolumenCargo" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-cyan-600 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">CARGO TRANSFERENCIA</p>
-                <div id="kpiTransferencias" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-cyan-500 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">REQ PLANTA</p>
+                <div id="kpiReqPlanta" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-teal-600 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">PEDIDOS CHEP <span class="text-[9px] font-normal lowercase block text-slate-400">(pallet arrendado)</span></p>
-                <div id="kpiPedidosChep" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-amber-500 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">CUMPLIDOS. PROY. vs REALES</p>
+                <div id="kpiOcupanReal" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-amber-500 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">CUMPLIDOS. PROY. vs REALES</p>
-                <div id="kpiOcupanReal" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-emerald-500 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">RETORNO TARIMA</p>
+                <div id="kpiRetorno" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
-            <div class="bg-white p-3.5 rounded-xl border-l-4 border-emerald-500 shadow-xs">
-                <p class="text-[10px] text-slate-500 font-bold uppercase">RETORNO TARIMA</p>
-                <div id="kpiRetorno" class="space-y-1 mt-1 max-h-32 overflow-y-auto text-xs font-bold text-slate-400">Sin selección</div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-fuchsia-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">PEDIDOS CHEP</p>
+                <div id="kpiPedidosChep" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
+            </div>
+            <div class="bg-white p-3.5 rounded-xl border-l-4 border-purple-600 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SEMANAS</p>
+                <div id="kpiSemanasCount" class="space-y-1 mt-1 max-h-32 overflow-y-auto"><span class="text-xs font-bold text-slate-400">Sin selección</span></div>
             </div>
         </div>
 
-        <!-- RESUMEN HISTÓRICO -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-            <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 xl:col-span-2">
-                <div class="border-b border-slate-100 pb-2 mb-3"><h2 class="text-sm font-bold text-slate-800">RESUMEN HISTÓRICO</h2></div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs border-collapse">
-                        <thead class="bg-slate-900 text-white">
-                            <tr>
-                                <th class="p-2.5">Indicador</th>
-                                <th id="thResumenAnterior" class="p-2.5 text-right">VALOR (año anterior)</th>
-                                <th id="thResumenActual" class="p-2.5 text-right">VALOR (año actual)</th>
-                                <th class="p-2.5 text-right">Variación Monto/Volumen</th>
-                                <th class="p-2.5 text-right bg-slate-800">Var. Precio Unitario (Fuente 1 Col. F)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaResumenBody" class="divide-y divide-slate-100">
-                            <tr><td colspan="5" class="p-4 text-center text-slate-400">Selecciona filtros para generar el resumen histórico.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-            <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
-                <div class="border-b border-slate-100 pb-2 mb-3">
-                    <h2 class="text-sm font-bold text-slate-800">PEDIDOS/CARGAS CHEP</h2>
-                    <p class="text-xs text-slate-500">Equivalencia estimada (estándar 504 tarimas).</p>
-                </div>
-                <div id="resumenPedidosCargas" class="space-y-3"><div class="text-xs text-slate-400">Selecciona filtros para calcular.</div></div>
-            </section>
-        </div>
-
-        <!-- HISTÓRICO FACTURA SEMANAL -->
-        <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
-            <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
-                <div>
-                    <h3 class="text-sm font-bold text-slate-800">HISTÓRICO FACTURA SEMANAL</h3>
-                    <p class="text-xs text-slate-400">Análisis comparativo de facturas, variaciones entre semanas y proyección estimada para semanas sin registros.</p>
-                </div>
+        <!-- Resumen de variaciones según filtros -->
+        <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
+            <div class="border-b border-slate-100 pb-2 mb-3">
+                <h2 class="text-sm font-bold text-slate-800">RESUMEN</h2>
+                <p class="text-xs text-slate-400 mt-1">Variaciones en cantidades absolutas según los filtros seleccionados; no se muestran porcentajes.</p>
             </div>
-            <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-72">
+            <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs border-collapse">
-                    <thead class="bg-slate-900 text-white sticky top-0 z-10">
+                    <thead class="bg-slate-900 text-white">
                         <tr>
-                            <th class="p-2.5">Año</th>
-                            <th class="p-2.5">Mes</th>
-                            <th class="p-2.5">Semana</th>
-                            <th class="p-2.5 text-right">Facturación Total ($)</th>
-                            <th class="p-2.5 text-right">Var. vs Sem. Ant. (%)</th>
-                            <th class="p-2.5 text-right">Cargo Canal (Vol.)</th>
-                            <th class="p-2.5 text-right">Cargo Transferencia ($)</th>
-                            <th class="p-2.5 text-right">Pedidos CHEP ($)</th>
-                            <th class="p-2.5 text-right">REQ Planta</th>
-                            <th class="p-2.5 text-right">Retorno Tarima</th>
+                            <th class="p-2.5">Indicador</th>
+                            <th class="p-2.5">Comparación</th>
+                            <th class="p-2.5 text-right">Valor anterior / proyección</th>
+                            <th class="p-2.5 text-right">Valor actual / real</th>
+                            <th class="p-2.5 text-right">Variación</th>
                         </tr>
                     </thead>
-                    <tbody id="tablaHistoricoFacturaBody" class="divide-y divide-slate-100">
-                        <tr><td colspan="10" class="p-4 text-center text-slate-400">Selecciona filtros para visualizar el histórico de factura semanal.</td></tr>
+                    <tbody id="tablaResumenBody" class="divide-y divide-slate-100">
+                        <tr><td colspan="5" class="p-4 text-center text-slate-400">Selecciona filtros para generar el resumen.</td></tr>
                     </tbody>
                 </table>
             </div>
         </section>
 
-        <!-- Gráficas (Azul Marino) -->
+        <!-- Gráficas Principales -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white p-5 rounded-xl border border-slate-200">
+            <!-- Gráfica 1: Facturación -->
+            <div class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
                 <h3 class="text-sm font-bold text-slate-800 mb-1">Facturación</h3>
                 <p id="subtextFacturacion" class="text-xs text-slate-400 mb-4">Compara el monto total y su variación porcentual.</p>
                 <div class="h-64 relative"><canvas id="chartFacturacionAnual"></canvas></div>
             </div>
-            <div class="bg-white p-5 rounded-xl border border-slate-200">
+            <!-- Gráfica 2: REQ PLANTA vs RETORNO TARIMA -->
+            <div class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
                 <h3 class="text-sm font-bold text-slate-800 mb-1">REQ PLANTA vs RETORNO TARIMA</h3>
                 <p id="subtextPlanta" class="text-xs text-slate-400 mb-4">Seguimiento físico y variación individual por concepto.</p>
                 <div class="h-64 relative"><canvas id="chartBalancePlanta"></canvas></div>
             </div>
         </div>
 
-        <!-- Proyección de Pedidos -->
-        <div class="bg-white p-5 rounded-xl border border-slate-200 space-y-4">
+        <!-- Apartado Proyección de Pedidos -->
+        <div class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
             <div class="flex flex-wrap justify-between items-center border-b border-slate-100 pb-2 gap-2">
                 <div>
                     <h3 class="text-sm font-bold text-slate-800">Proyección de Pedidos</h3>
                     <p id="subtextProyeccionTipo" class="text-xs text-slate-400">Estimación de requerimientos futuros.</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-1.5 text-xs bg-slate-50 border p-1 rounded-lg">
+                    <div id="containerFactorEstimacion" class="flex items-center gap-1.5 text-xs bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
                         <label for="inputFactorEstimacion" class="font-semibold text-slate-600">Estimación (%):</label>
-                        <input type="number" id="inputFactorEstimacion" value="5" step="0.5" class="w-12 text-center font-bold text-blue-700 bg-white border rounded py-0.5" onchange="generarProyeccion()">
+                        <input type="number" id="inputFactorEstimacion" value="5" step="0.5" class="w-12 text-center font-bold text-blue-700 bg-white border border-slate-300 rounded py-0.5 focus:outline-none focus:border-blue-500" onchange="generarProyeccion()">
                     </div>
-                    <button onclick="descargarProyeccionExcel()" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer">📥 Descargar Proyección</button>
+                    <button onclick="descargarProyeccionExcel()" class="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer">
+                        📥 Descargar Proyección
+                    </button>
                 </div>
             </div>
             <div class="overflow-x-auto max-h-64 border border-slate-200 rounded-lg">
                 <table class="w-full text-left text-xs border-collapse">
                     <thead class="bg-slate-900 text-white sticky top-0 z-10">
                         <tr>
-                            <th class="p-2.5">Semana Operativa</th><th class="p-2.5">Mes Asociado</th>
-                            <th id="thProyReq" class="p-2.5 text-right bg-blue-900">Proy. REQ</th>
-                            <th id="thProyRet" class="p-2.5 text-right bg-emerald-900">Proy. RETORNO</th>
-                            <th class="p-2.5 text-right">Prom. REQ Planta</th><th class="p-2.5 text-right">Prom. REAL</th>
+                            <th class="p-2.5">Semana Operativa</th>
+                            <th class="p-2.5">Mes Asociado</th>
+                            <th id="thProyReq" class="p-2.5 text-right bg-blue-900">Proy. REQ 2027</th>
+                            <th id="thProyRet" class="p-2.5 text-right bg-emerald-900">Proy. RETORNO 2027</th>
+                            <th class="p-2.5 text-right">Prom. REQ Planta</th>
+                            <th class="p-2.5 text-right">Prom. REAL</th>
                             <th class="p-2.5 text-right">PEDIDOS PROYECTADOS</th>
                         </tr>
                     </thead>
                     <tbody id="tablaProyeccionBody" class="divide-y divide-slate-100">
-                        <tr><td colspan="7" class="p-4 text-center text-slate-400">Selecciona filtros para generar la proyección.</td></tr>
+                        <tr><td colspan="7" class="p-4 text-center text-slate-400">Cargue información y seleccione filtros para generar la proyección.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -214,408 +219,717 @@
 
     </main>
 
-    <!-- Modal Notificación -->
+    <!-- Modal personalizado para notificaciones -->
     <div id="modalNotificacion" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
         <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4 border border-slate-100">
             <h4 class="text-sm font-bold text-slate-800" id="modalTitulo">Notificación</h4>
             <p class="text-xs text-slate-600 leading-relaxed" id="modalMensaje"></p>
             <div class="text-right">
-                <button onclick="cerrarModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer">Aceptar</button>
+                <button onclick="cerrarModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-lg cursor-pointer transition-colors">Aceptar</button>
             </div>
         </div>
     </div>
 
     <script>
-        let dataF1 = [], dataF2 = [];
-        let aniosDisponibles = [], mesesDisponibles = [], semanasDisponibles = [];
-        let aniosSeleccionados = new Set(), mesesSeleccionados = new Set(), semanasSeleccionadas = new Set();
-        let ultimoKPIExportar = [], ultimaProyeccionExportar = [];
-        let chartFacturaInstance = null, chartPlantaInstance = null;
-
-        const ordenMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
-        const CONFIG_DATOS = { url: './datos_chep.json' };
-
-        function mostrarNotificacion(msj, tit = "Notificación") {
-            document.getElementById('modalTitulo').innerText = tit;
-            document.getElementById('modalMensaje').innerText = msj;
+        function mostrarNotificacion(mensaje, titulo = "Notificación") {
+            document.getElementById('modalTitulo').innerText = titulo;
+            document.getElementById('modalMensaje').innerText = mensaje;
             document.getElementById('modalNotificacion').classList.remove('hidden');
         }
-        function cerrarModal() { document.getElementById('modalNotificacion').classList.add('hidden'); }
 
-        window.onload = async function() { await actualizarDatosCentralizados(false); };
+        function cerrarModal() {
+            document.getElementById('modalNotificacion').classList.add('hidden');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' || 
+                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || 
+                (e.ctrlKey && (e.key === 'U' || e.key === 's' || e.key === 'S'))) {
+                e.preventDefault();
+                mostrarNotificacion("Acción bloqueada por seguridad de propiedad intelectual.", "Seguridad");
+                return false;
+            }
+        });
+
+        let dataF1 = [];
+        let dataF2 = [];
+        
+        let aniosDisponibles = [];
+        let aniosSeleccionados = new Set();
+        let mesesDisponibles = [];
+        let mesesSeleccionados = new Set();
+        let semanasDisponibles = [];
+        let semanasSeleccionadas = new Set();
+
+        let ultimoKPIExportar = [];
+        let ultimaProyeccionExportar = [];
+        let chartFacturaInstance = null;
+        let chartPlantaInstance = null;
+
+        const ordenMeses = [
+            "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+            "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+        ];
+
+        // CONFIGURACIÓN DE DATOS:
+        // Si el JSON está publicado en otra URL, reemplaza './datos_chep.json' por su URL HTTPS.
+        // La URL debe permitir que el navegador la lea (mismo origen o CORS autorizado).
+        const CONFIG_DATOS = {
+            url: './datos_chep.json'
+        };
+        let ultimaCargaCentral = null;
+        let cargaCentralEnCurso = false;
+
+        window.onload = async function() {
+            // Carga los datos una sola vez al entrar. Las actualizaciones posteriores son manuales.
+            await actualizarDatosCentralizados(false);
+        };
 
         async function actualizarDatosCentralizados(mostrarAviso = false) {
+            if (cargaCentralEnCurso) return;
+            cargaCentralEnCurso = true;
+            const estado = document.getElementById('estadoActualizacion');
+            if (estado) estado.innerText = 'Consultando la fuente central de datos…';
             try {
-                const respuesta = await fetch(CONFIG_DATOS.url + '?_=' + Date.now(), { cache: 'no-store' });
+                const separador = CONFIG_DATOS.url.includes('?') ? '&' : '?';
+                const respuesta = await fetch(CONFIG_DATOS.url + separador + '_=' + Date.now(), {
+                    cache: 'no-store',
+                    credentials: 'same-origin'
+                });
                 if (!respuesta.ok) throw new Error('HTTP ' + respuesta.status);
                 const data = await respuesta.json();
-                dataF1 = data.f1 || []; dataF2 = data.f2 || [];
-                dataF1.forEach(r => r.SEMANA = limpiarSemana(r.SEMANA));
-                dataF2.forEach(r => r.SEMANA = limpiarSemana(r.SEMANA));
+                if (!data || !Array.isArray(data.f1) || !Array.isArray(data.f2)) {
+                    throw new Error('El JSON debe contener arreglos "f1" y "f2".');
+                }
+                dataF1 = data.f1;
+                dataF2 = data.f2;
+                dataF1.forEach(r => { if (r.SEMANA !== undefined) r.SEMANA = limpiarSemana(r.SEMANA); });
+                dataF2.forEach(r => { if (r.SEMANA !== undefined) r.SEMANA = limpiarSemana(r.SEMANA); });
+                localStorage.setItem('chep_f1', JSON.stringify(dataF1));
+                localStorage.setItem('chep_f2', JSON.stringify(dataF2));
+                ultimaCargaCentral = new Date();
+                document.getElementById('statusMemoria').innerText = '✔ Datos cargados desde la fuente central.';
+                if (estado) estado.innerText = 'Datos centrales actualizados: ' + ultimaCargaCentral.toLocaleString('es-MX');
                 extraerFiltros(false);
-                if (mostrarAviso) mostrarNotificacion('Datos cargados con éxito.', 'Actualizado');
+                if (mostrarAviso) mostrarNotificacion('Los datos se cargaron correctamente desde la fuente central.', 'Actualización completada');
             } catch (err) {
-                if (mostrarAviso) mostrarNotificacion('Error cargando fuente central.', 'Error');
+                // No se sustituyen los datos por ceros: se conservan los últimos datos válidos.
+                const savedF1 = localStorage.getItem('chep_f1');
+                const savedF2 = localStorage.getItem('chep_f2');
+                if (dataF1.length === 0 && savedF1 && savedF2) {
+                    try {
+                        dataF1 = JSON.parse(savedF1);
+                        dataF2 = JSON.parse(savedF2);
+                        extraerFiltros(false);
+                    } catch (e) { console.error(e); }
+                }
+                if (estado) estado.innerText = 'No se pudo consultar la fuente central. ' + (ultimaCargaCentral ? 'Se conservan los últimos datos cargados el ' + ultimaCargaCentral.toLocaleString('es-MX') : 'Se intentará usar la copia local disponible.') + ' Detalle: ' + err.message;
+                if (mostrarAviso) mostrarNotificacion('No fue posible actualizar desde la fuente central. Verifica la URL, permisos y que el servidor permita leer el JSON. ' + err.message, 'No se pudo actualizar');
+                console.warn('Actualización central fallida:', err);
+            } finally {
+                cargaCentralEnCurso = false;
             }
         }
 
         function toggleAdminPanel() {
             const panel = document.getElementById('panelAdmin');
             if (panel.classList.contains('hidden')) {
-                if (prompt("Contraseña:") === "CHEP2026") panel.classList.remove('hidden');
-                else mostrarNotificacion("Acceso Denegado");
-            } else panel.classList.add('hidden');
+                const pass = prompt("Introduce la contraseña de Administrador:");
+                if (pass === "CHEP2026") {
+                    panel.classList.remove('hidden');
+                } else if (pass !== null) {
+                    mostrarNotificacion("Contraseña incorrecta.", "Acceso Denegado");
+                }
+            } else {
+                panel.classList.add('hidden');
+            }
         }
 
         function limpiarSemana(val) {
-            if (!val) return '';
+            if (val === undefined || val === null) return '';
             let s = String(val).replace(/W/gi, '').trim();
             let num = parseInt(s, 10);
             return isNaN(num) ? s : String(num).padStart(2, '0');
         }
 
         function cargarFuente1(input) {
-            const file = input.files[0]; if(!file) return;
+            const file = input.files[0];
+            if(!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
-                const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
-                dataF1 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                dataF1.forEach(r => r.SEMANA = limpiarSemana(r.SEMANA));
-                extraerFiltros(true);
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                    dataF1 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    dataF1.forEach(r => { if(r.SEMANA) r.SEMANA = limpiarSemana(r.SEMANA); });
+                    localStorage.setItem('chep_f1', JSON.stringify(dataF1));
+                    extraerFiltros(true);
+                    mostrarNotificacion("Fuente 1 cargada exitosamente.", "Éxito");
+                } catch(err) {
+                    mostrarNotificacion("Error al procesar el archivo de Fuente 1.", "Error");
+                }
             };
             reader.readAsArrayBuffer(file);
         }
 
         function cargarFuente2(input) {
-            const file = input.files[0]; if(!file) return;
+            const file = input.files[0];
+            if(!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
-                const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
-                let sheet = workbook.Sheets[workbook.SheetNames.find(s => s.trim().toUpperCase() === "CONSOLIDADOS INF") || workbook.SheetNames[0]];
-                const raw = XLSX.utils.sheet_to_json(sheet, {header: 1});
-                dataF2 = raw.slice(1).filter(r => r && r.length).map(r => ({
-                    SEMANA: limpiarSemana(r[0]), AÑO: r[1], MES: String(r[2]||'').trim().toUpperCase(),
-                    REQ_PLANTA: parseFloat(r[3])||0, OCUPAN: parseFloat(r[4])||0, REAL: parseFloat(r[5])||0, RETORNO: parseFloat(r[6])||0
-                }));
-                extraerFiltros(true);
+                try {
+                    const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                    let sheetName = workbook.SheetNames.find(s => s.trim().toUpperCase() === "CONSOLIDADOS INF") || workbook.SheetNames[0];
+                    const rawJson = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
+
+                    dataF2 = [];
+                    for(let i = 1; i < rawJson.length; i++) {
+                        const row = rawJson[i];
+                        if(!row || row.length === 0) continue;
+                        dataF2.push({
+                            SEMANA: limpiarSemana(row[0]),
+                            AÑO: row[1],
+                            MES: row[2] ? String(row[2]).trim().toUpperCase() : '',
+                            REQ_PLANTA: parseFloat(row[3]) || 0,
+                            OCUPAN: parseFloat(row[4]) || 0,
+                            REAL: parseFloat(row[5]) || 0,
+                            RETORNO: parseFloat(row[6]) || 0
+                        });
+                    }
+                    localStorage.setItem('chep_f2', JSON.stringify(dataF2));
+                    extraerFiltros(true);
+                    mostrarNotificacion("Fuente 2 cargada exitosamente.", "Éxito");
+                } catch(err) {
+                    mostrarNotificacion("Error al procesar el archivo de Fuente 2.", "Error");
+                }
             };
             reader.readAsArrayBuffer(file);
         }
 
         function guardarDatos() {
-            const blob = new Blob([JSON.stringify({ f1: dataF1, f2: dataF2 }, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'datos_chep.json'; a.click();
+            if(dataF1.length > 0 || dataF2.length > 0) {
+                localStorage.setItem('chep_f1', JSON.stringify(dataF1));
+                localStorage.setItem('chep_f2', JSON.stringify(dataF2));
+                
+                // Generar descarga del archivo datos_chep.json para subirlo a GitHub
+                const payload = JSON.stringify({ f1: dataF1, f2: dataF2 }, null, 2);
+                const blob = new Blob([payload], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'datos_chep.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                mostrarNotificacion("Se ha descargado 'datos_chep.json'. Publica este archivo JSON en la misma ubicación web que el dashboard (o configura CONFIG_DATOS.url con la URL HTTPS accesible) para que los usuarios puedan cargar los datos compartidos.", "Guardado Centralizado");
+            } else {
+                mostrarNotificacion("No hay datos cargados para guardar.", "Advertencia");
+            }
         }
 
         function compartirDashboardOutlook() {
-            window.location.href = `mailto:?subject=Dashboard%20CHEP&body=${encodeURIComponent(window.location.href)}`;
+            const urlActual = window.location.href;
+            const asunto = encodeURIComponent("Dashboard Ejecutivo CHEP & Operación Planta");
+            const cuerpo = encodeURIComponent(`Hola,\n\nTe comparto el enlace para acceder al Dashboard Ejecutivo CHEP & Operación Planta con los datos más recientes:\n\n${urlActual}\n\nSaludos.`);
+            
+            window.location.href = `mailto:?subject=${asunto}&body=${cuerpo}`;
         }
 
         function extraerFiltros(seleccionarTodo = false) {
             let aniosSet = new Set(), mesesSet = new Set(), semanasSet = new Set();
-            [...dataF1, ...dataF2].forEach(r => {
-                if(r.AÑO) aniosSet.add(String(r.AÑO).trim());
-                if(r.MES) mesesSet.add(String(r.MES).trim().toUpperCase());
-                if(r.SEMANA) semanasSet.add(limpiarSemana(r.SEMANA));
+            [...dataF1, ...dataF2].forEach(row => {
+                if(row.AÑO) aniosSet.add(String(row.AÑO));
+                if(row.MES) mesesSet.add(String(row.MES).toUpperCase());
+                if(row.SEMANA) semanasSet.add(limpiarSemana(row.SEMANA));
             });
 
-            aniosDisponibles = Array.from(aniosSet).filter(a => a && a !== '').sort().reverse();
-            mesesDisponibles = Array.from(mesesSet).filter(m => m && !/^\d{4}$/.test(m)).sort((a, b) => ordenMeses.indexOf(a) - ordenMeses.indexOf(b));
-            semanasDisponibles = Array.from(semanasSet).filter(s => s).sort((a,b) => parseInt(a) - parseInt(b));
+            aniosDisponibles = Array.from(aniosSet).sort().reverse();
+            
+            mesesDisponibles = Array.from(mesesSet).sort((a, b) => {
+                let idxA = ordenMeses.indexOf(a);
+                let idxB = ordenMeses.indexOf(b);
+                if(idxA === -1) idxA = 99;
+                if(idxB === -1) idxB = 99;
+                return idxA - idxB;
+            });
+
+            semanasDisponibles = Array.from(semanasSet).sort((a,b) => parseInt(a) - parseInt(b));
 
             if(seleccionarTodo) {
                 aniosSeleccionados = new Set(aniosDisponibles);
                 mesesSeleccionados = new Set(mesesDisponibles);
                 semanasSeleccionadas = new Set(semanasDisponibles);
             }
-            renderizarGrids(); aplicarFiltros();
+
+            renderizarGrids();
+            aplicarFiltros();
         }
 
         function renderizarGrids() {
-            const renderBtn = (container, list, set, css) => {
-                const el = document.getElementById(container); el.innerHTML = '';
-                list.forEach(v => {
-                    const sel = set.has(v);
-                    const btn = document.createElement('button');
-                    btn.innerText = container === 'gridSemanas' ? `W ${v}` : v;
-                    btn.className = `${css} ${sel ? 'bg-cyan-600 text-white border-cyan-700' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`;
-                    btn.onclick = () => { sel ? set.delete(v) : set.add(v); renderizarGrids(); aplicarFiltros(); };
-                    el.appendChild(btn);
-                });
-            };
-            renderBtn('gridAnios', aniosDisponibles, aniosSeleccionados, 'text-[11px] font-bold py-1 px-2 rounded-md border');
-            renderBtn('gridMeses', mesesDisponibles, mesesSeleccionados, 'text-[10px] font-bold py-1 px-1 rounded-md border truncate');
-            renderBtn('gridSemanas', semanasDisponibles, semanasSeleccionadas, 'text-[9px] font-bold py-1 px-0.5 rounded-md border');
+            const gAnios = document.getElementById('gridAnios');
+            gAnios.innerHTML = '';
+            aniosDisponibles.forEach(a => {
+                const sel = aniosSeleccionados.has(a);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = a;
+                btn.className = `text-[11px] font-bold py-1 px-2 rounded-md border transition-all cursor-pointer ${sel ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`;
+                btn.onclick = () => {
+                    if(aniosSeleccionados.has(a)) aniosSeleccionados.delete(a); else aniosSeleccionados.add(a);
+                    renderizarGrids(); aplicarFiltros();
+                };
+                gAnios.appendChild(btn);
+            });
+
+            const gMeses = document.getElementById('gridMeses');
+            gMeses.innerHTML = '';
+            mesesDisponibles.forEach(m => {
+                const sel = mesesSeleccionados.has(m);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = m;
+                btn.className = `text-[10px] font-bold py-1 px-1 rounded-md border transition-all truncate cursor-pointer ${sel ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`;
+                btn.onclick = () => {
+                    if(mesesSeleccionados.has(m)) mesesSeleccionados.delete(m); else mesesSeleccionados.add(m);
+                    renderizarGrids(); aplicarFiltros();
+                };
+                gMeses.appendChild(btn);
+            });
+
+            const gSemanas = document.getElementById('gridSemanas');
+            gSemanas.innerHTML = '';
+            semanasDisponibles.forEach(s => {
+                const sel = semanasSeleccionadas.has(s);
+                const etiqueta = `W ${s}`;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = etiqueta;
+                btn.className = `text-[9px] font-bold py-1 px-0.5 rounded-md border transition-all cursor-pointer ${sel ? 'bg-amber-500 text-white border-amber-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`;
+                btn.onclick = () => {
+                    if(semanasSeleccionadas.has(s)) semanasSeleccionadas.delete(s); else semanasSeleccionadas.add(s);
+                    renderizarGrids(); aplicarFiltros();
+                };
+                gSemanas.appendChild(btn);
+            });
         }
 
         function resetearFiltros() {
-            aniosSeleccionados.clear(); mesesSeleccionados.clear(); semanasSeleccionadas.clear();
-            renderizarGrids(); aplicarFiltros();
+            aniosSeleccionados.clear();
+            mesesSeleccionados.clear();
+            semanasSeleccionadas.clear();
+            renderizarGrids();
+            aplicarFiltros();
         }
 
         function aplicarFiltros() {
-            const match = r => (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO).trim())) &&
-                             (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES).trim().toUpperCase())) &&
-                             (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA)));
+            const f1Filtered = dataF1.filter(row => {
+                return (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(row.AÑO))) &&
+                       (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(row.MES).toUpperCase())) &&
+                       (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(row.SEMANA)));
+            });
 
-            const f1F = dataF1.filter(match), f2F = dataF2.filter(match);
-            procesarDashboard(f1F, f2F);
-            generarHistoricoFacturaSemanal(f1F, f2F);
+            const f2Filtered = dataF2.filter(row => {
+                return (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(row.AÑO))) &&
+                       (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(row.MES).toUpperCase())) &&
+                       (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(row.SEMANA)));
+            });
+
+            procesarDashboard(f1Filtered, f2Filtered);
             generarProyeccion();
         }
 
         function procesarDashboard(f1, f2) {
-            let d1 = {}, d2 = {}; ultimoKPIExportar = [];
-            f1.forEach(r => {
-                const k = `${r.AÑO||'S/N'} - Sem ${limpiarSemana(r.SEMANA||'S/N')}`;
-                if(!d1[k]) d1[k] = { fact: 0, mov: 0, trans: 0, ped: 0 };
-                const tot = parseFloat(r.TOTAL)||0, c = String(r.CONCEPTO||'').toUpperCase();
-                d1[k].fact += tot;
-                if(c.includes('TRANSFERENCIA')) d1[k].trans += tot;
-                if(c.includes('PALLET ARRENDADO') || c.includes('PEDIDOS CHEP')) d1[k].ped += tot;
-                if(/\bCARGO\s+CANAL\b/.test(c)) d1[k].mov += parseFloat(r.MOV)||0;
+            let detalleF1 = {}, detalleF2 = {};
+            ultimoKPIExportar = [];
+
+            f1.forEach(row => {
+                const anio = String(row.AÑO || 'S/N');
+                const sem = limpiarSemana(row.SEMANA || 'S/N');
+                const key = `${anio} - Sem ${sem}`;
+                const total = parseFloat(row.TOTAL) || 0;
+                const mov = parseFloat(row.MOV) || 0;
+
+                if(!detalleF1[key]) detalleF1[key] = { anio, sem, fact: 0, mov: 0, pedidosChep: 0 };
+                detalleF1[key].fact += total;
+                const conceptoNormalizado = String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                if (conceptoNormalizado.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) detalleF1[key].pedidosChep += total;
+                if(/\bCARGO\s+CANAL\b/i.test(String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim())) {
+                    detalleF1[key].mov += mov;
+                }
             });
 
-            f2.forEach(r => {
-                const k = `${r.AÑO||'S/N'} - Sem ${limpiarSemana(r.SEMANA||'S/N')}`;
-                if(!d2[k]) d2[k] = { req: 0, oc: 0, real: 0, ret: 0 };
-                d2[k].req += r.REQ_PLANTA; d2[k].oc += r.OCUPAN; d2[k].real += r.REAL; d2[k].ret += r.RETORNO;
+            f2.forEach(row => {
+                const anio = String(row.AÑO || 'S/N');
+                const sem = limpiarSemana(row.SEMANA || 'S/N');
+                const key = `${anio} - Sem ${sem}`;
+
+                if(!detalleF2[key]) detalleF2[key] = { anio, sem, req: 0, oc: 0, real: 0, ret: 0 };
+                detalleF2[key].req += row.REQ_PLANTA;
+                detalleF2[key].oc += row.OCUPAN;
+                detalleF2[key].real += row.REAL;
+                detalleF2[key].ret += row.RETORNO;
             });
 
-            let keys = Array.from(new Set([...Object.keys(d1), ...Object.keys(d2)])).sort().reverse();
-            let hFact = '', hVol = '', hTrans = '', hReq = '', hOcReal = '', hRet = '', hPed = '', semSet = new Set();
+            let keysUnidas = Array.from(new Set([...Object.keys(detalleF1), ...Object.keys(detalleF2)])).sort().reverse();
 
-            if(!keys.length || (!aniosSeleccionados.size && !mesesSeleccionados.size && !semanasSeleccionadas.size)) {
-                hFact = hVol = hTrans = hReq = hOcReal = hRet = hPed = '<span class="text-xs font-bold text-slate-400">Sin selección</span>';
-                document.getElementById('kpiSemanasCount').innerText = 'Sin selección';
+            let htmlFact = '', htmlVol = '', htmlReq = '', htmlOcReal = '', htmlRet = '', htmlPedidosChep = '', htmlSem = '';
+            let semanasUnicas = new Set();
+
+            if(keysUnidas.length === 0 || (aniosSeleccionados.size === 0 && mesesSeleccionados.size === 0 && semanasSeleccionadas.size === 0)) {
+                htmlFact = htmlVol = htmlReq = htmlOcReal = htmlRet = htmlPedidosChep = htmlSem = '<span class="text-xs font-bold text-slate-400">Sin selección</span>';
             } else {
-                keys.forEach(k => {
-                    let f = d1[k]||{fact:0,mov:0,trans:0,ped:0}, p = d2[k]||{req:0,oc:0,real:0,ret:0};
-                    let [a, s] = k.split(' - Sem '); semSet.add(s);
-                    let lbl = `${a} (W ${s})`;
-                    const itemHTML = (val, col) => `<div class="flex justify-between text-[11px] py-0.5 border-b"><span class="text-slate-500">${lbl}:</span><span class="font-extrabold ${col}">${val}</span></div>`;
-                    
-                    hFact += itemHTML(`$${f.fact.toLocaleString('es-MX',{minimumFractionDigits:2})}`, 'text-blue-700');
-                    hVol += itemHTML(f.mov.toLocaleString(), 'text-indigo-900');
-                    hTrans += itemHTML(`$${f.trans.toLocaleString('es-MX',{minimumFractionDigits:2})}`, 'text-cyan-700');
-                    hPed += itemHTML(`$${f.ped.toLocaleString('es-MX',{minimumFractionDigits:2})}`, 'text-teal-700');
-                    hOcReal += itemHTML(`${p.oc.toLocaleString()} / ${p.real.toLocaleString()}`, 'text-amber-700');
-                    hRet += itemHTML(p.ret.toLocaleString(), 'text-emerald-700');
+                keysUnidas.forEach(k => {
+                    let f = detalleF1[k] || { fact: 0, mov: 0, pedidosChep: 0 };
+                    let p = detalleF2[k] || { req: 0, oc: 0, real: 0, ret: 0 };
+                    let partes = k.split(' - ');
+                    let semLimpia = partes[1].replace('Sem ', '').trim();
+                    let etiqueta = `${partes[0]} (W ${semLimpia})`;
+                    semanasUnicas.add(semLimpia);
+
+                    htmlFact += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-blue-700">$${f.fact.toLocaleString('es-MX', {minimumFractionDigits: 2})}</span></div>`;
+                    htmlVol += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-indigo-700">${f.mov.toLocaleString()}</span></div>`;
+                    htmlReq += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-cyan-700">${p.req.toLocaleString()}</span></div>`;
+                    htmlOcReal += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-amber-700">${p.oc.toLocaleString()} / ${p.real.toLocaleString()}</span></div>`;
+                    htmlRet += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-emerald-700">${p.ret.toLocaleString()}</span></div>`;
+                    htmlPedidosChep += `<div class="flex justify-between items-center text-[11px] border-b border-slate-50 py-0.5"><span class="text-slate-500 font-semibold">${etiqueta}:</span><span class="font-extrabold text-fuchsia-700">$${f.pedidosChep.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span></div>`;
+
+                    ultimoKPIExportar.push({
+                        Periodo: etiqueta,
+                        "Facturación Total": f.fact,
+                        "Volumen Cargo Canal": f.mov,
+                        "PEDIDOS CHEP": f.pedidosChep,
+                        "REQ Planta": p.req,
+                        "Ocupan": p.oc,
+                        "Real": p.real,
+                        "Retorno": p.ret
+                    });
                 });
-                document.getElementById('kpiSemanasCount').innerHTML = `<span class="text-xs font-extrabold text-cyan-400">${semSet.size} Semanas activas</span>`;
+                htmlSem = `<span class="text-xs font-extrabold text-purple-700">${semanasUnicas.size} Semanas activas</span>`;
             }
 
-            document.getElementById('kpiFacturacion').innerHTML = hFact;
-            document.getElementById('kpiVolumenCargo').innerHTML = hVol;
-            document.getElementById('kpiTransferencias').innerHTML = hTrans;
-            document.getElementById('kpiPedidosChep').innerHTML = hPed;
-            document.getElementById('kpiOcupanReal').innerHTML = hOcReal;
-            document.getElementById('kpiRetorno').innerHTML = hRet;
+            document.getElementById('kpiFacturacion').innerHTML = htmlFact;
+            document.getElementById('kpiVolumenCargo').innerHTML = htmlVol;
+            document.getElementById('kpiReqPlanta').innerHTML = htmlReq;
+            document.getElementById('kpiOcupanReal').innerHTML = htmlOcReal;
+            document.getElementById('kpiRetorno').innerHTML = htmlRet;
+            document.getElementById('kpiPedidosChep').innerHTML = htmlPedidosChep;
+            document.getElementById('kpiSemanasCount').innerHTML = htmlSem;
+            renderizarResumen(f1, f2);
 
-            renderizarResumenHistorico(f1, f2);
-            renderChartFacturacion(Array.from(aniosSeleccionados).sort().reverse(), d1);
-            renderChartPlanta(d2);
+            let aniosActivos = Array.from(aniosSeleccionados).sort().reverse();
+            let sumaAniosF1 = {};
+            aniosActivos.forEach(a => sumaAniosF1[a] = 0);
+            Object.values(detalleF1).forEach(item => {
+                if(sumaAniosF1[item.anio] !== undefined) sumaAniosF1[item.anio] += item.fact;
+            });
+
+            renderChartFacturacion(aniosActivos, aniosActivos.map(a => sumaAniosF1[a] || 0));
+            renderChartPlanta(detalleF2);
         }
 
-        function fmt(v, mon = false) {
-            const n = Number(v) || 0;
-            return mon ? '$' + n.toLocaleString('es-MX', {minimumFractionDigits: 2}) : n.toLocaleString('es-MX');
+        function formatearCantidad(valor, moneda = false) {
+            const n = Number(valor) || 0;
+            return moneda
+                ? '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : n.toLocaleString('es-MX', { maximumFractionDigits: 2 });
         }
 
-        function renderizarResumenHistorico(f1, f2) {
+        function renderizarResumen(f1, f2) {
             const tbody = document.getElementById('tablaResumenBody');
-            if(!aniosSeleccionados.size && !mesesSeleccionados.size && !semanasSeleccionadas.size) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Selecciona filtros.</td></tr>';
+            const sinFiltros = aniosSeleccionados.size === 0 && mesesSeleccionados.size === 0 && semanasSeleccionadas.size === 0;
+            if (sinFiltros) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-400">Selecciona uno o más filtros para generar el resumen.</td></tr>';
                 return;
             }
 
-            let porAnio = {};
-            f1.forEach(r => {
-                let a = String(r.AÑO||'').trim(); if(!a) return;
-                if(!porAnio[a]) porAnio[a] = { fact:0, cargo:0, trans:0, ped:0, req:0, ret:0, pre:{} };
-                let tot = parseFloat(r.TOTAL)||0, c = String(r.CONCEPTO||'').toUpperCase();
-                porAnio[a].fact += tot;
-                if(/\bCARGO\s+CANAL\b/.test(c)) porAnio[a].cargo += parseFloat(r.MOV)||0;
-                if(c.includes('TRANSFERENCIA')) porAnio[a].trans += tot;
-                if(c.includes('PALLET ARRENDADO')) porAnio[a].ped += tot;
-                let pu = parseFloat(r['C/U']||r['PRECIO']||0);
-                if(pu>0) { if(!porAnio[a].pre[c]) porAnio[a].pre[c]=[]; porAnio[a].pre[c].push(pu); }
+            const porAnio = {};
+            const asegurar = (anio) => {
+                if (!porAnio[anio]) porAnio[anio] = { fact: 0, cargo: 0, pedidosChep: 0, req: 0, ocupan: 0, real: 0, retorno: 0 };
+                return porAnio[anio];
+            };
+            f1.forEach(row => {
+                const anio = String(row.AÑO || '').trim();
+                if (!anio) return;
+                const d = asegurar(anio);
+                d.fact += Number.parseFloat(row.TOTAL) || 0;
+                const concepto = String(row.CONCEPTO || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+                if (/\bCARGO\s+CANAL\b/.test(concepto)) d.cargo += Number.parseFloat(row.MOV) || 0;
+                if (concepto.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) d.pedidosChep += Number.parseFloat(row.TOTAL) || 0;
+            });
+            f2.forEach(row => {
+                const anio = String(row.AÑO || '').trim();
+                if (!anio) return;
+                const d = asegurar(anio);
+                d.req += Number.parseFloat(row.REQ_PLANTA) || 0;
+                d.ocupan += Number.parseFloat(row.OCUPAN) || 0;
+                d.real += Number.parseFloat(row.REAL) || 0;
+                d.retorno += Number.parseFloat(row.RETORNO) || 0;
             });
 
-            f2.forEach(r => {
-                let a = String(r.AÑO||'').trim(); if(!a) return;
-                if(!porAnio[a]) porAnio[a] = { fact:0, cargo:0, trans:0, ped:0, req:0, ret:0, pre:{} };
-                porAnio[a].req += r.REQ_PLANTA; porAnio[a].ret += r.RETORNO;
-            });
-
-            let anios = Object.keys(porAnio).sort();
-            let act = anios[anios.length-1], ant = anios[anios.length-2];
-            document.getElementById('thResumenAnterior').innerText = `VALOR (${ant||'anterior'})`;
-            document.getElementById('thResumenActual').innerText = `VALOR (${act||'actual'})`;
-
-            let rows = [];
-            const addRow = (nom, field, mon, cKey) => {
-                if(!act || !ant) { rows.push(`<tr><td class="p-2.5">${nom}</td><td colspan="4" class="text-center text-slate-400">Datos insuficientes</td></tr>`); return; }
-                let vAnt = porAnio[ant][field]||0, vAct = porAnio[act][field]||0, diff = vAct - vAnt;
-                let cColor = diff > 0 ? 'text-emerald-700' : diff < 0 ? 'text-rose-700' : 'text-slate-600';
-                
-                let varPU = '-';
-                if(cKey && porAnio[ant].pre[cKey] && porAnio[act].pre[cKey]) {
-                    let pAnt = porAnio[ant].pre[cKey].reduce((a,b)=>a+b,0)/porAnio[ant].pre[cKey].length;
-                    let pAct = porAnio[act].pre[cKey].reduce((a,b)=>a+b,0)/porAnio[act].pre[cKey].length;
-                    let dPU = pAct - pAnt;
-                    varPU = `<span class="${dPU>0?'text-rose-600':'text-emerald-600'} font-bold">${dPU>0?'+':''}${dPU.toFixed(2)}</span>`;
+            const anios = Object.keys(porAnio).filter(a => /^\d{4}$/.test(a)).sort((a, b) => Number(a) - Number(b));
+            const anioActual = anios[anios.length - 1];
+            const anioAnterior = anios[anios.length - 2];
+            const filas = [];
+            const agregarComparacionAnual = (nombre, campo, moneda = false) => {
+                if (!anioActual || !anioAnterior) {
+                    filas.push(`<tr><td class="p-2.5 font-semibold">${nombre}</td><td class="p-2.5 text-slate-500">Comparación entre años</td><td colspan="3" class="p-2.5 text-center text-slate-400">Selecciona datos de al menos dos años para comparar.</td></tr>`);
+                    return;
                 }
-
-                rows.push(`<tr>
-                    <td class="p-2.5 font-semibold">${nom}</td>
-                    <td class="p-2.5 text-right">${fmt(vAnt, mon)}</td>
-                    <td class="p-2.5 text-right">${fmt(vAct, mon)}</td>
-                    <td class="p-2.5 text-right font-bold ${cColor}">${diff>0?'Aumentó':'Disminuyó'}: ${fmt(Math.abs(diff), mon)}</td>
-                    <td class="p-2.5 text-right">${varPU}</td>
-                </tr>`);
+                const anterior = porAnio[anioAnterior][campo] || 0;
+                const actual = porAnio[anioActual][campo] || 0;
+                const diff = actual - anterior;
+                const texto = diff > 0 ? 'Aumentó' : diff < 0 ? 'Disminuyó' : 'Sin cambio';
+                const clase = diff > 0 ? 'text-emerald-700' : diff < 0 ? 'text-rose-700' : 'text-slate-600';
+                filas.push(`<tr><td class="p-2.5 font-semibold">${nombre}</td><td class="p-2.5 text-slate-500">${anioActual} vs ${anioAnterior}</td><td class="p-2.5 text-right">${formatearCantidad(anterior, moneda)}</td><td class="p-2.5 text-right">${formatearCantidad(actual, moneda)}</td><td class="p-2.5 text-right font-bold ${clase}">${texto}: ${formatearCantidad(Math.abs(diff), moneda)}</td></tr>`);
             };
 
-            addRow('Facturación total', 'fact', true, '');
-            addRow('Volumen Cargo Canal', 'cargo', false, 'CARGO CANAL');
-            addRow('CARGO TRANSFERENCIA', 'trans', true, 'TRANSFERENCIA');
-            addRow('PEDIDOS CHEP (Pallet arrendado)', 'ped', true, 'CUOTA ENTREGA DE PALLET ARRENDADO');
-            addRow('REQ PLANTA', 'req', false, '');
-            addRow('RETORNO TARIMA', 'ret', false, '');
+            agregarComparacionAnual('Facturación total', 'fact', true);
+            agregarComparacionAnual('Volumen Cargo Canal', 'cargo');
+            agregarComparacionAnual('REQ PLANTA', 'req');
 
-            tbody.innerHTML = rows.join('');
-        }
+            const totalOcupan = Object.values(porAnio).reduce((s, d) => s + d.ocupan, 0);
+            const totalReal = Object.values(porAnio).reduce((s, d) => s + d.real, 0);
+            const difCumplidos = totalReal - totalOcupan;
+            const textoCumplidos = difCumplidos > 0 ? 'Reales por encima de proyección' : difCumplidos < 0 ? 'Reales por debajo de proyección' : 'Reales iguales a proyección';
+            const claseCumplidos = difCumplidos > 0 ? 'text-emerald-700' : difCumplidos < 0 ? 'text-rose-700' : 'text-slate-600';
+            filas.push(`<tr><td class="p-2.5 font-semibold">CUMPLIDOS. PROY. vs REALES</td><td class="p-2.5 text-slate-500">OCUPAN vs REAL en el periodo filtrado</td><td class="p-2.5 text-right">${formatearCantidad(totalOcupan)}</td><td class="p-2.5 text-right">${formatearCantidad(totalReal)}</td><td class="p-2.5 text-right font-bold ${claseCumplidos}">${textoCumplidos}: ${formatearCantidad(Math.abs(difCumplidos))}</td></tr>`);
 
-        function generarHistoricoFacturaSemanal(f1, f2) {
-            const tbody = document.getElementById('tablaHistoricoFacturaBody');
-            tbody.innerHTML = '';
-            let map = {};
-
-            f1.forEach(r => {
-                let k = `${r.AÑO}_${r.MES}_${limpiarSemana(r.SEMANA)}`;
-                if(!map[k]) map[k] = { a: r.AÑO, m: r.MES, s: limpiarSemana(r.SEMANA), f:0, c:0, t:0, p:0, req:0, ret:0, esProyectado: false };
-                let tot = parseFloat(r.TOTAL)||0, conc = String(r.CONCEPTO||'').toUpperCase();
-                map[k].f += tot;
-                if(conc.includes('TRANSFERENCIA')) map[k].t += tot;
-                if(conc.includes('PALLET ARRENDADO')) map[k].p += tot;
-                if(/\bCARGO\s+CANAL\b/.test(conc)) map[k].c += parseFloat(r.MOV)||0;
-            });
-
-            f2.forEach(r => {
-                let k = `${r.AÑO}_${r.MES}_${limpiarSemana(r.SEMANA)}`;
-                if(!map[k]) map[k] = { a: r.AÑO, m: r.MES, s: limpiarSemana(r.SEMANA), f:0, c:0, t:0, p:0, req:0, ret:0, esProyectado: false };
-                map[k].req += r.REQ_PLANTA; map[k].ret += r.RETORNO;
-            });
-
-            let keys = Object.keys(map).sort((a,b) => {
-                let [aA, aM, aS] = a.split('_'), [bA, bM, bS] = b.split('_');
-                if(aA !== bA) return Number(aA) - Number(bA);
-                if(aM !== bM) return ordenMeses.indexOf(aM) - ordenMeses.indexOf(bM);
-                return Number(aS) - Number(bS);
-            });
-
-            if(!keys.length) { tbody.innerHTML = '<tr><td colspan="10" class="p-4 text-center text-slate-400">Sin datos</td></tr>'; return; }
-
-            // Proyección automática para semanas sin datos dentro del periodo
-            let acumuladoFact = 0, contadorFact = 0;
-            keys.forEach(k => {
-                if(map[k].f > 0) {
-                    acumuladoFact += map[k].f;
-                    contadorFact++;
-                } else if(contadorFact > 0) {
-                    let prom = acumuladoFact / contadorFact;
-                    map[k].f = prom;
-                    map[k].t = prom * 0.15;
-                    map[k].p = prom * 0.25;
-                    map[k].esProyectado = true;
-                }
-            });
-
-            for(let i = 0; i < keys.length; i++) {
-                let curr = map[keys[i]];
-                let prev = i > 0 ? map[keys[i-1]] : null;
-                
-                let varPctStr = '-';
-                if(prev && prev.f > 0) {
-                    let varPct = ((curr.f - prev.f) / prev.f) * 100;
-                    let cColor = varPct > 0 ? 'text-emerald-600' : varPct < 0 ? 'text-rose-600' : 'text-slate-600';
-                    varPctStr = `<span class="${cColor} font-bold">${varPct > 0 ? '+' : ''}${varPct.toFixed(1)}%</span>`;
-                }
-
-                let badgeProy = curr.esProyectado ? `<span class="ml-1 px-1.5 py-0.5 text-[9px] bg-cyan-100 text-cyan-800 rounded font-bold">Proyección</span>` : '';
-
-                tbody.innerHTML += `<tr class="${curr.esProyectado ? 'bg-cyan-50/40' : 'hover:bg-slate-50'}">
-                    <td class="p-2.5 font-bold">${curr.a}</td>
-                    <td class="p-2.5">${curr.m}</td>
-                    <td class="p-2.5 font-bold text-blue-800">W ${curr.s}${badgeProy}</td>
-                    <td class="p-2.5 text-right font-extrabold text-blue-700">${fmt(curr.f, true)}</td>
-                    <td class="p-2.5 text-right">${varPctStr}</td>
-                    <td class="p-2.5 text-right">${fmt(curr.c)}</td>
-                    <td class="p-2.5 text-right font-semibold text-cyan-700">${fmt(curr.t, true)}</td>
-                    <td class="p-2.5 text-right font-semibold text-teal-700">${fmt(curr.p, true)}</td>
-                    <td class="p-2.5 text-right">${fmt(curr.req)}</td>
-                    <td class="p-2.5 text-right text-emerald-700">${fmt(curr.ret)}</td>
-                </tr>`;
-            }
+            agregarComparacionAnual('RETORNO TARIMA', 'retorno');
+            agregarComparacionAnual('PEDIDOS CHEP', 'pedidosChep', true);
+            tbody.innerHTML = filas.join('');
         }
 
         function generarProyeccion() {
-            const tbody = document.getElementById('tablaProyeccionBody'); tbody.innerHTML = '';
-            const factor = (parseFloat(document.getElementById('inputFactorEstimacion').value) || 0) / 100;
-            let datos = dataF2.filter(r => (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO))) &&
-                                           (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES))) &&
-                                           (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA))));
+            const tbody = document.getElementById('tablaProyeccionBody');
+            tbody.innerHTML = '';
+            ultimaProyeccionExportar = [];
 
-            if(!datos.length) { tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400">Sin datos</td></tr>'; return; }
+            const thProyReq = document.getElementById('thProyReq');
+            const thProyRet = document.getElementById('thProyRet');
+            const subtextTipo = document.getElementById('subtextProyeccionTipo');
 
-            let semMap = {};
-            datos.forEach(r => {
-                let s = limpiarSemana(r.SEMANA);
-                if(!semMap[s]) semMap[s] = { req:0, real:0, ret:0, cnt:0, m: r.MES };
-                semMap[s].req += r.REQ_PLANTA; semMap[s].real += r.REAL; semMap[s].ret += r.RETORNO; semMap[s].cnt++;
-            });
+            const factorEstimacion = (parseFloat(document.getElementById('inputFactorEstimacion').value) || 0) / 100;
 
-            Object.keys(semMap).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(s => {
-                let info = semMap[s], pReq = info.req / info.cnt, pReal = info.real / info.cnt, pRet = info.ret / info.cnt;
-                tbody.innerHTML += `<tr class="hover:bg-slate-50">
-                    <td class="p-2.5 font-bold">W ${s}</td><td class="p-2.5">${info.m}</td>
-                    <td class="p-2.5 text-right font-bold text-blue-700 bg-blue-50">${Math.round(pReq*(1+factor)).toLocaleString()}</td>
-                    <td class="p-2.5 text-right font-bold text-emerald-700 bg-emerald-50">${Math.round(pRet*(1+factor)).toLocaleString()}</td>
-                    <td class="p-2.5 text-right text-cyan-600">${pReq.toFixed(1)}</td>
-                    <td class="p-2.5 text-right text-amber-600">${pReal.toFixed(1)}</td>
-                    <td class="p-2.5 text-right font-bold text-indigo-900 bg-indigo-50">${Math.round(pReal*(1+factor)).toLocaleString()}</td>
-                </tr>`;
-            });
+            // Pronóstico Rodante: Ocurre cuando se selecciona solo un año
+            if (aniosSeleccionados.size === 1) {
+                const anioSeleccionado = Array.from(aniosSeleccionados)[0];
+                let mesObj = "seleccionados";
+
+                if (mesesSeleccionados.size === 1) {
+                    mesObj = Array.from(mesesSeleccionados)[0].toUpperCase();
+                }
+
+                subtextTipo.innerText = `Pronóstico Rodante: Estimación del año en curso (${anioSeleccionado}) para mes(es) ${mesObj} basada en los 3 meses anteriores + ${factorEstimacion * 100}%.`;
+                
+                thProyReq.innerText = `Proy. REQ ${anioSeleccionado}`;
+                thProyRet.innerText = `Proy. RETORNO ${anioSeleccionado}`;
+
+                let datosAnio = dataF2.filter(r => String(r.AÑO) === String(anioSeleccionado));
+
+                if (datosAnio.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400">No hay información suficiente para el año ${anioSeleccionado}.</td></tr>`;
+                    return;
+                }
+
+                let mesesConDatos = Array.from(new Set(datosAnio.map(r => String(r.MES).toUpperCase()))).sort((a,b) => ordenMeses.indexOf(a) - ordenMeses.indexOf(b));
+                
+                let mesesProyectar = (mesesSeleccionados.size > 0) ? Array.from(mesesSeleccionados).map(m => m.toUpperCase()) : mesesConDatos;
+
+                mesesProyectar.forEach(mDestino => {
+                    let idxMes = ordenMeses.indexOf(mDestino);
+                    let mesesAnteriores = [];
+                    for (let i = 1; i <= 3; i++) {
+                        if (idxMes - i >= 0) {
+                            mesesAnteriores.push(ordenMeses[idxMes - i]);
+                        }
+                    }
+
+                    let datos3Meses = datosAnio.filter(r => mesesAnteriores.includes(String(r.MES).toUpperCase()));
+                    let datosMesDestino = datosAnio.filter(r => String(r.MES).toUpperCase() === mDestino);
+
+                    let semanasDestino = Array.from(new Set(datosMesDestino.map(r => limpiarSemana(r.SEMANA)))).sort((a,b) => parseInt(a) - parseInt(b));
+
+                    if (semanasDestino.length === 0) {
+                        semanasDestino = Array.from(new Set(datos3Meses.map(r => limpiarSemana(r.SEMANA)))).sort((a,b) => parseInt(a) - parseInt(b)).slice(0, 4);
+                    }
+
+                    semanasDestino.forEach(sem => {
+                        let filtradosSem = datos3Meses.filter(r => limpiarSemana(r.SEMANA) === sem);
+                        
+                        let promReq = 0, promReal = 0, promRet = 0;
+                        if (filtradosSem.length > 0) {
+                            promReq = filtradosSem.reduce((s, r) => s + r.REQ_PLANTA, 0) / filtradosSem.length;
+                            promReal = filtradosSem.reduce((s, r) => s + r.REAL, 0) / filtradosSem.length;
+                            promRet = filtradosSem.reduce((s, r) => s + r.RETORNO, 0) / filtradosSem.length;
+                        } else if (datos3Meses.length > 0) {
+                            promReq = datos3Meses.reduce((s, r) => s + r.REQ_PLANTA, 0) / datos3Meses.length;
+                            promReal = datos3Meses.reduce((s, r) => s + r.REAL, 0) / datos3Meses.length;
+                            promRet = datos3Meses.reduce((s, r) => s + r.RETORNO, 0) / datos3Meses.length;
+                        }
+
+                        let proyReq = Math.round(promReq * (1 + factorEstimacion));
+                        let proyRet = Math.round(promRet * (1 + factorEstimacion));
+                        let pedidosProyectados = Math.round(promReal * (1 + factorEstimacion));
+
+                        let etiquetaSemana = `W ${sem}`;
+
+                        let tr = document.createElement('tr');
+                        tr.className = "hover:bg-slate-50";
+                        tr.innerHTML = `
+                            <td class="p-2.5 font-bold text-slate-700">${etiquetaSemana}</td>
+                            <td class="p-2.5 text-slate-500">${mDestino}</td>
+                            <td class="p-2.5 text-right font-bold text-blue-700 bg-blue-50">${proyReq.toLocaleString()}</td>
+                            <td class="p-2.5 text-right font-bold text-emerald-700 bg-emerald-50">${proyRet.toLocaleString()}</td>
+                            <td class="p-2.5 text-right font-semibold text-cyan-600">${promReq.toLocaleString('es-MX', {maximumFractionDigits: 1})}</td>
+                            <td class="p-2.5 text-right font-semibold text-amber-600">${promReal.toLocaleString('es-MX', {maximumFractionDigits: 1})}</td>
+                            <td class="p-2.5 text-right font-bold text-indigo-700 bg-indigo-50">${pedidosProyectados.toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+
+                        ultimaProyeccionExportar.push({
+                            "Semana Operativa": etiquetaSemana,
+                            "Mes Asociado": mDestino,
+                            [`Proy. REQ ${anioSeleccionado}`]: proyReq,
+                            [`Proy. RETORNO ${anioSeleccionado}`]: proyRet,
+                            "Promedio REQ Planta": promReq,
+                            "Promedio REAL": promReal,
+                            "PEDIDOS PROYECTADOS": pedidosProyectados
+                        });
+                    });
+                });
+
+            } else {
+                // Pronóstico Basado en Históricos Completos: Ocurre cuando se seleccionan 2 o más años
+                subtextTipo.innerText = `Pronóstico Basado en Históricos Completos: Estimación requerimientos 2027 (+${factorEstimacion * 100}%).`;
+                thProyReq.innerText = "Proy. REQ 2027";
+                thProyRet.innerText = "Proy. RETORNO 2027";
+
+                let datosHistoricos = dataF2.filter(row => {
+                    return (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(row.AÑO))) &&
+                           (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(row.MES).toUpperCase())) &&
+                           (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(row.SEMANA)));
+                });
+
+                if(datosHistoricos.length === 0 || (aniosSeleccionados.size === 0 && mesesSeleccionados.size === 0 && semanasSeleccionadas.size === 0)) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400">Sin selección o datos insuficientes en los filtros actuales.</td></tr>`;
+                    return;
+                }
+
+                let mapaSemanas = {};
+                datosHistoricos.forEach(row => {
+                    let sem = limpiarSemana(row.SEMANA);
+                    if(!mapaSemanas[sem]) {
+                        mapaSemanas[sem] = { reqTotal: 0, realTotal: 0, retTotal: 0, count: 0, mes: row.MES || 'N/A' };
+                    }
+                    mapaSemanas[sem].reqTotal += row.REQ_PLANTA;
+                    mapaSemanas[sem].realTotal += row.REAL;
+                    mapaSemanas[sem].retTotal += row.RETORNO;
+                    mapaSemanas[sem].count += 1;
+                });
+
+                let semanasOrdenadas = Object.keys(mapaSemanas).sort((a,b)=>parseInt(a)-parseInt(b));
+
+                semanasOrdenadas.forEach(sem => {
+                    let info = mapaSemanas[sem];
+                    let promReq = info.reqTotal / (info.count || 1);
+                    let promReal = info.realTotal / (info.count || 1);
+                    let promRet = info.retTotal / (info.count || 1);
+
+                    let proyReq2027 = Math.round(promReq * (1 + factorEstimacion)); 
+                    let proyRet2027 = Math.round(promRet * (1 + factorEstimacion));
+                    let pedidosProyectados = Math.round(promReal * (1 + factorEstimacion));
+
+                    let etiquetaSemana = `W ${sem}`;
+
+                    let tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-50";
+                    tr.innerHTML = `
+                        <td class="p-2.5 font-bold text-slate-700">${etiquetaSemana}</td>
+                        <td class="p-2.5 text-slate-500">${info.mes}</td>
+                        <td class="p-2.5 text-right font-bold text-blue-700 bg-blue-50">${proyReq2027.toLocaleString()}</td>
+                        <td class="p-2.5 text-right font-bold text-emerald-700 bg-emerald-50">${proyRet2027.toLocaleString()}</td>
+                        <td class="p-2.5 text-right font-semibold text-cyan-600">${promReq.toLocaleString('es-MX', {maximumFractionDigits: 1})}</td>
+                        <td class="p-2.5 text-right font-semibold text-amber-600">${promReal.toLocaleString('es-MX', {maximumFractionDigits: 1})}</td>
+                        <td class="p-2.5 text-right font-bold text-indigo-700 bg-indigo-50">${pedidosProyectados.toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(tr);
+
+                    ultimaProyeccionExportar.push({
+                        "Semana Operativa": etiquetaSemana,
+                        "Mes Asociado": info.mes,
+                        "Proyección REQ 2027": proyReq2027,
+                        "Proyección RETORNO 2027": proyRet2027,
+                        "Promedio REQ Planta": promReq,
+                        "Promedio REAL": promReal,
+                        "PEDIDOS PROYECTADOS": pedidosProyectados
+                    });
+                });
+            }
         }
 
-        function renderChartFacturacion(anios, d1) {
+        function renderChartFacturacion(anios, valores) {
             const ctx = document.getElementById('chartFacturacionAnual').getContext('2d');
             if(chartFacturaInstance) chartFacturaInstance.destroy();
-            let vals = anios.map(a => Object.values(d1).filter(i => i.a === a).reduce((s,i)=>s+i.fact,0));
+
+            let subtexto = "Comparativa de montos totales facturados.";
+            if(anios.length >= 2) {
+                let actual = valores[0] || 0;
+                let anterior = valores[1] || 0;
+                let diff = anterior > 0 ? ((actual - anterior) / anterior) * 100 : 0;
+                let flecha = diff >= 0 ? '▲ Aumento de' : '▼ Disminución de';
+                subtexto = `${flecha} ${Math.abs(diff).toFixed(1)}% en el año actual vs el anterior.`;
+            }
+            document.getElementById('subtextFacturacion').innerText = subtexto;
 
             chartFacturaInstance = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: anios.map(a => 'Año ' + a), datasets: [{ label: 'Factura ($)', data: vals, backgroundColor: ['#0f172a', '#1e3a8a'] }] },
+                data: {
+                    labels: anios.map(a => 'Año ' + a),
+                    datasets: [{ label: 'Monto Total Factura ($)', data: valores, backgroundColor: ['#2dd4bf', '#c084fc'] }]
+                },
                 options: { responsive: true, maintainAspectRatio: false }
             });
         }
 
-        function renderChartPlanta(d2) {
+        function renderChartPlanta(detalleF2) {
             const ctx = document.getElementById('chartBalancePlanta').getContext('2d');
             if(chartPlantaInstance) chartPlantaInstance.destroy();
-            let d25 = {req:0, ret:0}, d26 = {req:0, ret:0};
-            Object.entries(d2).forEach(([k, v]) => {
-                if(k.startsWith('2025')) { d25.req += v.req; d25.ret += v.ret; }
-                if(k.startsWith('2026')) { d26.req += v.req; d26.ret += v.ret; }
+
+            let d2025 = { req: 0, ret: 0 };
+            let d2026 = { req: 0, ret: 0 };
+
+            Object.values(detalleF2).forEach(item => {
+                if(item.anio === '2025') {
+                    d2025.req += item.req; d2025.ret += item.ret;
+                } else if(item.anio === '2026') {
+                    d2026.req += item.req; d2026.ret += item.ret;
+                }
             });
+
+            let diffReq = d2025.req > 0 ? ((d2026.req - d2025.req) / d2025.req) * 100 : 0;
+            let diffRet = d2025.ret > 0 ? ((d2026.ret - d2025.ret) / d2025.ret) * 100 : 0;
+            
+            let flechaReq = diffReq >= 0 ? '▲ Aumento' : '▼ Disminución';
+            let flechaRet = diffRet >= 0 ? '▲ Aumento' : '▼ Disminución';
+
+            document.getElementById('subtextPlanta').innerText = `REQ PLANTA: ${flechaReq} de ${Math.abs(diffReq).toFixed(1)}% | RETORNO TARIMA: ${flechaRet} de ${Math.abs(diffRet).toFixed(1)}% vs anterior.`;
 
             chartPlantaInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: ['REQ PLANTA', 'RETORNO TARIMA'],
                     datasets: [
-                        { label: '2025', data: [d25.req, d25.ret], backgroundColor: '#1e3a8a' },
-                        { label: '2026', data: [d26.req, d26.ret], backgroundColor: '#0f172a' }
+                        {
+                            label: 'Año 2025',
+                            data: [d2025.req, d2025.ret],
+                            backgroundColor: '#c084fc'
+                        },
+                        {
+                            label: 'Año 2026',
+                            data: [d2026.req, d2026.ret],
+                            backgroundColor: '#2dd4bf'
+                        }
                     ]
                 },
                 options: { responsive: true, maintainAspectRatio: false }
@@ -623,12 +937,25 @@
         }
 
         function descargarDataExcel() {
-            if(!ultimoKPIExportar.length) return mostrarNotificacion("Sin datos para exportar.");
-            XLSX.writeFile(XLSX.utils.book_new(), "Dashboard_CHEP_KPIs.xlsx");
+            if (ultimoKPIExportar.length === 0) {
+                mostrarNotificacion("No hay datos en los KPIs actuales para exportar.", "Exportar");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(ultimoKPIExportar);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "KPIs y Operacion");
+            XLSX.writeFile(workbook, "Dashboard_CHEP_KPIs.xlsx");
         }
+
         function descargarProyeccionExcel() {
-            if(!ultimaProyeccionExportar.length) return mostrarNotificacion("Sin datos de proyección.");
-            XLSX.writeFile(XLSX.utils.book_new(), "Proyeccion_Pedidos_CHEP.xlsx");
+            if (ultimaProyeccionExportar.length === 0) {
+                mostrarNotificacion("No hay datos de proyección para exportar.", "Exportar");
+                return;
+            }
+            const worksheet = XLSX.utils.json_to_sheet(ultimaProyeccionExportar);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Proyeccion Pedidos");
+            XLSX.writeFile(workbook, "Proyeccion_Pedidos_CHEP.xlsx");
         }
     </script>
 </body>
