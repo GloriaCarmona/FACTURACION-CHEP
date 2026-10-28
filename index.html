@@ -1032,5 +1032,105 @@
             XLSX.writeFile(libro, 'Datos_Dashboard_CHEP.xlsx');
         }
     </script>
+
+<script>
+(function () {
+    function addCollapse(panel, header, label, nodes) {
+        if (!panel || !header || panel.dataset.collapseReady === '1') return;
+        panel.dataset.collapseReady = '1';
+        header.classList.add('flex', 'items-center', 'justify-between', 'gap-3');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'shrink-0 inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 hover:bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600 cursor-pointer';
+        button.setAttribute('aria-expanded', 'true');
+        button.innerHTML = '<span class="collapse-label">Ocultar</span><span class="collapse-icon" aria-hidden="true">▲</span>';
+        button.setAttribute('aria-label', 'Ocultar o desplegar ' + label);
+        header.appendChild(button);
+        const body = document.createElement('div');
+        body.className = 'collapse-content';
+        body.dataset.collapseLabel = label;
+        nodes.forEach(node => { if (node && node.parentNode === panel) body.appendChild(node); });
+        panel.appendChild(body);
+        button.addEventListener('click', function () {
+            const isOpen = button.getAttribute('aria-expanded') === 'true';
+            button.setAttribute('aria-expanded', String(!isOpen));
+            body.classList.toggle('hidden', isOpen);
+            button.querySelector('.collapse-label').textContent = isOpen ? 'Desplegar' : 'Ocultar';
+            button.querySelector('.collapse-icon').textContent = isOpen ? '▼' : '▲';
+            if (isOpen) return;
+            requestAnimationFrame(() => {
+                body.querySelectorAll('canvas').forEach(canvas => {
+                    const chart = window.Chart && Chart.getChart(canvas);
+                    if (chart) chart.resize();
+                });
+            });
+        });
+    }
+    function setup() {
+        const main = document.querySelector('main');
+        if (!main) return;
+        // Filtros de análisis
+        const filters = [...main.children].find(el => el.textContent.includes('Filtros de Análisis') && el.querySelector('#gridAnios'));
+        if (filters) {
+            const header = filters.firstElementChild;
+            addCollapse(filters, header, 'FILTROS DE ANÁLISIS', [...filters.children].slice(1));
+        }
+        // Indicadores principales (grupo de tarjetas)
+        const kpis = [...main.children].find(el => el.querySelector('#kpiFacturacion') && el.classList.contains('grid'));
+        if (kpis && !kpis.dataset.collapseReady) {
+            const control = document.createElement('div');
+            control.className = 'flex justify-end -mb-3';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-600 cursor-pointer';
+            btn.textContent = 'Ocultar INDICADORES PRINCIPALES ▲';
+            btn.setAttribute('aria-expanded', 'true');
+            control.appendChild(btn);
+            main.insertBefore(control, kpis);
+            kpis.dataset.collapseReady = '1';
+            btn.addEventListener('click', () => {
+                const open = btn.getAttribute('aria-expanded') === 'true';
+                btn.setAttribute('aria-expanded', String(!open));
+                kpis.classList.toggle('hidden', open);
+                btn.textContent = (open ? 'Desplegar' : 'Ocultar') + ' INDICADORES PRINCIPALES ' + (open ? '▼' : '▲');
+            });
+        }
+        // RESUMEN y DESGLOSE DE FACTURA, cada uno independiente
+        const summaryGrid = [...main.children].find(el => el.querySelector('#tablaResumenBody') && el.querySelector('#chartImpactoInflacionario'));
+        if (summaryGrid) {
+            const summary = summaryGrid.querySelector('section:has(#tablaResumenBody)');
+            const invoice = summaryGrid.querySelector('section:has(#chartImpactoInflacionario)');
+            [ [summary, 'RESUMEN'], [invoice, 'DESGLOSE DE FACTURA'] ].forEach(([panel,label]) => {
+                if (!panel) return;
+                const header = panel.firstElementChild;
+                addCollapse(panel, header, label, [...panel.children].slice(1));
+            });
+        }
+        // Apartados principales con encabezado en el primer elemento
+        const variation = main.querySelector('section:has(#chartVariacionCosto)');
+        const historical = main.querySelector('section:has(#tablaHistoricoFacturaBody)');
+        [[variation,'VARIACION COSTO'],[historical,'DETALLE DE FACTURA Y PROYECCIÓN']].forEach(([panel,label]) => {
+            if (panel) addCollapse(panel, panel.firstElementChild, label, [...panel.children].slice(1));
+        });
+        // Gráficas individuales inferiores
+        const chartFactura = main.querySelector('#chartFacturacionAnual');
+        const chartReq = main.querySelector('#chartReqPlanta');
+        [[chartFactura,'FACTURACIÓN'],[chartReq,'REQ PLANTA']].forEach(([canvas,label]) => {
+            if (!canvas) return;
+            const panel = canvas.closest('.bg-white');
+            const header = panel && panel.querySelector('h3');
+            if (panel && header) addCollapse(panel, header, label, [...panel.children].filter(node => node !== header));
+        });
+        const chartRetorno = main.querySelector('#chartRetornoVsPedidos');
+        if (chartRetorno) {
+            const panel = chartRetorno.closest('.bg-white');
+            const header = panel && panel.querySelector('h3');
+            if (panel && header) addCollapse(panel, header, 'VARIACION RETORNO TARIMA VS PEDIDOS CHEP', [...panel.children].filter(node => node !== header));
+        }
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup); else setup();
+})();
+</script>
+
 </body>
 </html>
