@@ -54,12 +54,8 @@
         </div>
 
         <!-- KPI SEMANAS -->
-        <div class="bg-slate-900 text-white p-2.5 rounded-xl shadow-sm flex items-center justify-between px-4">
-            <div class="flex items-center gap-2">
-                <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">SEMANAS ACTIVAS:</span>
-                <div id="kpiSemanasCount" class="text-xs font-extrabold text-white">Sin selección</div>
-            </div>
-            <span class="text-[10px] text-slate-400">Control de semanas seleccionadas</span>
+        <div class="hidden" aria-hidden="true">
+            <div id="kpiSemanasCount">Sin selección</div>
         </div>
 
         <!-- Filtros de Análisis -->
@@ -135,18 +131,43 @@
             <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200">
                 <div class="border-b border-slate-100 pb-2 mb-3">
                     <h2 class="text-sm font-bold text-slate-800">DESGLOSE DE FACTURA</h2>
-                    <p class="text-xs text-slate-500">Cada indicador como porcentaje de la Factura Total (100%).</p>
                 </div>
                 <div class="h-64 relative"><canvas id="chartImpactoInflacionario"></canvas></div>
             </section>
         </div>
+
+        <!-- VARIACION COSTO -->
+        <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
+            <div class="border-b border-slate-100 pb-2">
+                <h2 class="text-sm font-bold text-slate-800">VARIACION COSTO</h2>
+            </div>
+            <div class="h-80 relative"><canvas id="chartVariacionCosto"></canvas></div>
+            <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-96">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-900 text-white sticky top-0 z-10">
+                        <tr>
+                            <th class="p-2.5">Concepto</th>
+                            <th class="p-2.5">Semana</th>
+                            <th class="p-2.5">Año anterior</th>
+                            <th class="p-2.5 text-right">Costo unitario anterior</th>
+                            <th class="p-2.5">Año actual</th>
+                            <th class="p-2.5 text-right">Costo unitario actual</th>
+                            <th class="p-2.5 text-right">Variación ($)</th>
+                            <th class="p-2.5 text-right">Variación (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaVariacionCostoBody" class="divide-y divide-slate-100">
+                        <tr><td colspan="8" class="p-4 text-center text-slate-400">Selecciona filtros para visualizar las variaciones de costo.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
         <!-- HISTÓRICO FACTURA SEMANAL -->
         <section class="bg-white p-5 rounded-xl shadow-xs border border-slate-200 space-y-4">
             <div class="border-b border-slate-100 pb-2 flex justify-between items-center">
                 <div>
                     <h3 class="text-sm font-bold text-slate-800">DETALLE DE FACTURA Y PROYECCIÓN</h3>
-                    <p class="text-xs text-slate-400">Análisis comparativo de facturas y variaciones entre semanas.</p>
                 </div>
             </div>
             <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-72">
@@ -215,7 +236,7 @@
         let datosFiltradosF1 = [], datosFiltradosF2 = [];
         let aniosDisponibles = [], mesesDisponibles = [], semanasDisponibles = [];
         let aniosSeleccionados = new Set(), mesesSeleccionados = new Set(), semanasSeleccionadas = new Set();
-        let chartFacturaInstance = null, chartReqPlantaInstance = null, chartRetornoVsPedidosInstance = null, chartImpactoInstance = null;
+        let chartFacturaInstance = null, chartReqPlantaInstance = null, chartRetornoVsPedidosInstance = null, chartImpactoInstance = null, chartVariacionCostoInstance = null;
 
         const ordenMeses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
         const CONFIG_DATOS = { url: './datos_chep.json' };
@@ -438,6 +459,7 @@
             renderChartReqPlanta(f1, f2);
             renderChartRetornoVsPedidos(f1, f2);
             renderChartImpactoInflacionario(f1);
+            renderVariacionCosto();
         }
 
         function fmt(v, mon = false) {
@@ -801,6 +823,154 @@
             });
         }
 
+        function renderVariacionCosto() {
+            const canvas = document.getElementById('chartVariacionCosto');
+            const tbody = document.getElementById('tablaVariacionCostoBody');
+            if (!canvas || !tbody) return;
+            if (chartVariacionCostoInstance) chartVariacionCostoInstance.destroy();
+
+            const normalizarConcepto = valor => String(valor || '').trim().toUpperCase()
+                .replace(/[–—−]/g, '-')
+                .replace(/\s+/g, ' ')
+                .replace(/\s*%\s*/g, '%')
+                .replace(/\s*-\s*/g, '-');
+            const nombreConcepto = concepto => {
+                const c = normalizarConcepto(concepto);
+                if (c.includes('TRANSFERENCIA')) return 'CARGO TRANSFERENCIA';
+                if (c.includes('CUOTA ENTREGA DE PALLET ARRENDADO')) return 'PEDIDOS CHEP';
+                if (c.includes('RENTA DIARIA DEL PALLET ARRENDADO') || (c.includes('RENTA') && c.includes('PALLET ARRENDADO')) || c.includes('RENTA DIARIA')) return 'RENTA';
+                if (c.includes('CARGO CANAL') && /90%-94\.99%/.test(c)) return 'C.C 90%-94.99%';
+                if (c.includes('CARGO CANAL') && /95%-99\.99%/.test(c)) return 'C.C 95%-99.99%';
+                if (c.includes('CARGO CANAL') && /70%-89\.99%/.test(c)) return 'C.C 70%-89.99%';
+                if (c.includes('CARGO CANAL') && /50%-69\.99%/.test(c)) return 'C.C 50%-69.99%';
+                if (c.includes('CARGO CANAL') && /0%-9\.99%/.test(c)) return 'C.C 0%-9.99%';
+                return 'OTRO';
+            };
+            const conceptosOrden = ['CARGO TRANSFERENCIA', 'RENTA', 'PEDIDOS CHEP', 'C.C 90%-94.99%', 'C.C 95%-99.99%', 'C.C 70%-89.99%', 'C.C 50%-69.99%', 'C.C 0%-9.99%', 'OTRO'];
+            const leerPrecioUnitario = r => {
+                let v = r['C/U'] ?? r.C_U ?? r.CU ?? r.PRECIO_UNITARIO ?? r['PRECIO UNITARIO'];
+                if (v === undefined || v === null || v === '') v = Object.values(r)[5]; // Fuente 1, columna F
+                if (typeof v === 'string') v = v.replace(/[$,\s]/g, '');
+                const n = Number(v);
+                return v === '' || v === null || v === undefined || !Number.isFinite(n) ? null : n;
+            };
+            const leerAnio = r => String(r.AÑO ?? r.ANO ?? '').trim();
+            const leerSemana = r => limpiarSemana(r.SEMANA);
+            const leerMes = r => String(r.MES || '').trim().toUpperCase();
+            const hayFiltros = aniosSeleccionados.size || mesesSeleccionados.size || semanasSeleccionadas.size;
+            const moneda = v => v === null || v === undefined || !Number.isFinite(Number(v)) ? '—' : (Number(v) > 0 ? '$' : Number(v) < 0 ? '-$' : '$') + Math.abs(Number(v)).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 4});
+            const porcentaje = v => v === null || v === undefined || !Number.isFinite(Number(v)) ? '—' : `${v > 0 ? '+' : ''}${Number(v).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%`;
+            const vaciarGrafica = () => {
+                chartVariacionCostoInstance = new Chart(canvas, { type: 'bar', data: { labels: conceptosOrden, datasets: [] }, options: { responsive: true, maintainAspectRatio: false } });
+            };
+
+            if (!dataF1.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-400">Carga la Fuente 1 para consultar las variaciones de costo.</td></tr>';
+                vaciarGrafica();
+                return;
+            }
+
+            const aniosDisponiblesDatos = [...new Set(dataF1.map(leerAnio).filter(a => /^\d{4}$/.test(a)))].sort((a,b) => Number(a)-Number(b));
+            let aniosComparar = [];
+            if (aniosSeleccionados.size) {
+                const seleccionados = [...aniosSeleccionados].filter(a => /^\d{4}$/.test(a)).sort((a,b) => Number(a)-Number(b));
+                aniosComparar = [...seleccionados];
+                seleccionados.forEach(a => {
+                    const previo = String(Number(a)-1);
+                    if (aniosDisponiblesDatos.includes(previo) && !aniosComparar.includes(previo)) aniosComparar.push(previo);
+                });
+                aniosComparar.sort((a,b) => Number(a)-Number(b));
+            } else {
+                aniosComparar = aniosDisponiblesDatos.slice(-2);
+            }
+            if (aniosComparar.length < 2) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-400">Se necesitan al menos dos años de datos para comparar el costo unitario.</td></tr>';
+                vaciarGrafica();
+                return;
+            }
+            const anioActual = aniosComparar[aniosComparar.length - 1];
+            const anioAnterior = aniosComparar[aniosComparar.length - 2];
+            const coincidePeriodo = r =>
+                (!mesesSeleccionados.size || mesesSeleccionados.has(leerMes(r))) &&
+                (!semanasSeleccionadas.size || semanasSeleccionadas.has(leerSemana(r)));
+            const registros = dataF1.filter(r => aniosComparar.includes(leerAnio(r)) && coincidePeriodo(r));
+            const acumulados = new Map();
+            registros.forEach(r => {
+                const precio = leerPrecioUnitario(r);
+                if (precio === null) return;
+                const anio = leerAnio(r), semana = leerSemana(r);
+                // Columna D = CONCEPTO; fallback posicional para archivos con encabezados distintos.
+                const conceptoOriginal = String(r.CONCEPTO ?? r.Concepto ?? Object.values(r)[3] ?? '').trim();
+                if (!semana || !conceptoOriginal) return;
+                const concepto = nombreConcepto(conceptoOriginal);
+                const key = `${concepto}||${semana}`;
+                if (!acumulados.has(key)) acumulados.set(key, { concepto, semana, precios: {} });
+                const fila = acumulados.get(key);
+                if (!fila.precios[anio]) fila.precios[anio] = { suma: 0, n: 0 };
+                fila.precios[anio].suma += precio;
+                fila.precios[anio].n += 1;
+            });
+
+            const semanasEncontradas = [...new Set(registros.map(leerSemana).filter(Boolean))].sort((a,b) => Number(a)-Number(b));
+            const todasSemanas = semanasEncontradas.length ? semanasEncontradas : ['—'];
+            // Se preparan todas las categorías para que siempre aparezcan en la gráfica,
+            // incluso cuando un concepto no tenga variación en el periodo seleccionado.
+            const todasFilas = [];
+            todasSemanas.forEach(semana => conceptosOrden.forEach(concepto => {
+                const f = acumulados.get(`${concepto}||${semana}`);
+                const anterior = f?.precios[anioAnterior] ? f.precios[anioAnterior].suma / f.precios[anioAnterior].n : null;
+                const actual = f?.precios[anioActual] ? f.precios[anioActual].suma / f.precios[anioActual].n : null;
+                const variacion = anterior !== null && actual !== null ? actual - anterior : null;
+                const porcentajeCambio = anterior !== null && actual !== null && anterior !== 0 ? (variacion / Math.abs(anterior)) * 100 : null;
+                todasFilas.push({ concepto, semana, anterior, actual, variacion, porcentaje: porcentajeCambio });
+            }));
+            const filas = todasFilas.filter(f => f.anterior !== null && f.actual !== null && Math.abs(f.variacion) > 0.000001)
+                .sort((a,b) => conceptosOrden.indexOf(a.concepto)-conceptosOrden.indexOf(b.concepto) || Number(a.semana)-Number(b.semana));
+
+            if (!filas.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">No se encontraron variaciones de precio unitario entre ${anioAnterior} y ${anioActual} con los filtros seleccionados. La gráfica conserva visibles todos los conceptos.</td></tr>`;
+            } else {
+                tbody.innerHTML = filas.map(f => `<tr>
+                    <td class="p-2.5 font-semibold">${f.concepto}</td>
+                    <td class="p-2.5">W ${f.semana}</td>
+                    <td class="p-2.5">${anioAnterior}</td>
+                    <td class="p-2.5 text-right">${moneda(f.anterior)}</td>
+                    <td class="p-2.5">${anioActual}</td>
+                    <td class="p-2.5 text-right">${moneda(f.actual)}</td>
+                    <td class="p-2.5 text-right font-bold ${f.variacion > 0 ? 'text-rose-600' : 'text-emerald-700'}">${f.variacion > 0 ? '+' : ''}${moneda(f.variacion)}</td>
+                    <td class="p-2.5 text-right font-bold ${f.porcentaje > 0 ? 'text-rose-600' : 'text-emerald-700'}">${porcentaje(f.porcentaje)}</td>
+                </tr>`).join('');
+            }
+
+            // La variación queda escrita en la etiqueta de cada barra, no solo en el tooltip.
+            const etiquetas = todasFilas.map(f => {
+                const delta = f.variacion === null ? 'Sin comparación' : `Δ ${f.variacion > 0 ? '+' : ''}${moneda(f.variacion)} (${porcentaje(f.porcentaje)})`;
+                return [`${f.concepto} · W${f.semana}`, delta];
+            });
+            const datosAnterior = todasFilas.map(f => f.variacion !== null && Math.abs(f.variacion) > 0.000001 ? f.anterior : null);
+            const datosActual = todasFilas.map(f => f.variacion !== null && Math.abs(f.variacion) > 0.000001 ? f.actual : null);
+            chartVariacionCostoInstance = new Chart(canvas, {
+                type: 'bar',
+                data: { labels: etiquetas, datasets: [
+                    { label: `${anioAnterior}`, data: datosAnterior, backgroundColor: '#94a3b8', borderRadius: 3 },
+                    { label: `${anioActual}`, data: datosActual, backgroundColor: '#0891b2', borderRadius: 3 }
+                ] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { top: 35 } },
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        datalabels: { display: true, anchor: 'end', align: 'top', formatter: v => v === null ? '' : '$' + Number(v).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 4}), font: { weight: 'bold', size: 10 }, color: '#1e293b' },
+                        tooltip: { callbacks: { afterBody: items => { const f = todasFilas[items[0]?.dataIndex]; return f ? [`${anioAnterior}: ${moneda(f.anterior)}`, `${anioActual}: ${moneda(f.actual)}`, `Variación: ${f.variacion === null ? '—' : (f.variacion > 0 ? '+' : '') + moneda(f.variacion)}`, `Variación: ${porcentaje(f.porcentaje)}`] : []; } } }
+                    },
+                    scales: {
+                        x: { ticks: { autoSkip: false, maxRotation: 55, minRotation: 25, font: { size: 9 } } },
+                        y: { beginAtZero: false, title: { display: true, text: 'Costo unitario ($)' } }
+                    }
+                }
+            });
+        }
+
         function renderChartImpactoInflacionario(f1) {
             const ctx = document.getElementById('chartImpactoInflacionario');
             if (!ctx) return;
@@ -838,7 +1008,7 @@
                         datalabels: { anchor: 'end', align: 'top', formatter: val => `${val.toFixed(2)}%`, font: { weight: 'bold', size: 11 }, color: '#1e293b' },
                         tooltip: { callbacks: { label: c => ` ${c.raw.toFixed(2)}% de la factura total (${fmt(facturaTotal, true)})` } }
                     },
-                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: val => val + '%' }, title: { display: true, text: 'Porcentaje de Factura Total' } } }
+                    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: val => val + '%' } } }
                 }
             });
         }
