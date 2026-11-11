@@ -231,7 +231,7 @@
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200">
                     <h3 class="text-sm font-bold text-slate-800 mb-1">VARIACION RETORNO TARIMA VS PEDIDOS CHEP</h3>
-                    <p class="text-xs text-slate-400 mb-4">Pedidos CHEP y Retorno Tarima normalizados entre el estándar de 504.</p>
+                    <p class="text-xs text-slate-400 mb-4">Fuente 2: CUMP. REALES (F) contra retorno (G ÷ 504, redondeado).</p>
                     <div class="h-72 relative"><canvas id="chartRetornoVsPedidos"></canvas></div>
                 </div>
             </div>
@@ -294,7 +294,7 @@
                 const data = await respuesta.json();
                 dataF1 = data.f1 || []; dataF2 = data.f2 || [];
                 dataF1.forEach(r => r.SEMANA = limpiarSemana(r.SEMANA));
-                dataF2.forEach(r => r.SEMANA = limpiarSemana(r.SEMANA));
+                dataF2.forEach(r => { r.SEMANA = limpiarSemana(r.SEMANA); r.REQ_PLANTA = numero(r.REQ_PLANTA ?? r['REQ PLANTA'] ?? r.D); r.OCUPAN = valorOcupados(r); r.REAL = numero(r.REAL ?? r['CUMP. REALES'] ?? r['CUMP REALES'] ?? r.CUMP_REALES ?? r.F); r.RETORNO = numero(r.RETORNO ?? r['RETORNO TARIMA'] ?? r.G); });
                 extraerFiltros(false);
                 const estado = document.getElementById('statusMemoria');
                 if (estado) estado.textContent = `Datos centralizados cargados: ${dataF1.length} registros de facturas y ${dataF2.length} registros de consolidados.`;
@@ -345,7 +345,7 @@
         function clasificarConcepto(concepto) {
             const c = String(concepto || '').toUpperCase().trim();
             if (c.includes('TRANSFERENCIA')) return 'CARGO TRANSFERENCIA';
-            if (c.includes('PALLET ARRENDADO') && !c.includes('RENTA')) return 'PEDIDOS CHEP';
+            if (c === 'CUOTA ENTREGA DE PALLET ARRENDADO') return 'PEDIDOS CHEP';
             if (c.includes('RENTA') || c.includes('DIARIA') || c.includes('RENT')) return 'RENTA';
             if (c.includes('CANAL') || c.includes('CARGO CANAL')) return 'CARGO CANAL';
             return 'OTROS';
@@ -372,7 +372,7 @@
                 const raw = XLSX.utils.sheet_to_json(sheet, {header: 1});
                 dataF2 = raw.slice(1).filter(r => r && r.length).map(r => ({
                     SEMANA: limpiarSemana(r[0]), AÑO: r[1], MES: String(r[2]||'').trim().toUpperCase(),
-                    REQ_PLANTA: parseFloat(r[3])||0, OCUPAN: parseFloat(r[4])||0, REAL: parseFloat(r[5])||0, RETORNO: parseFloat(r[6])||0
+                    REQ_PLANTA: numero(r[3]), OCUPAN: numero(r[4]), REAL: numero(r[5]), RETORNO: numero(r[6])
                 }));
                 extraerFiltros(true);
             };
@@ -392,7 +392,7 @@
             let aniosSet = new Set(), mesesSet = new Set(), semanasSet = new Set();
             ([...dataF1, ...dataF2]).forEach(r => {
                 if(r.AÑO) aniosSet.add(String(r.AÑO).trim());
-                if(r.MES) mesesSet.add(String(r.MES).trim().toUpperCase());
+                if(r.MES) mesesSet.add(normalizarMes(r.MES));
                 if(r.SEMANA) semanasSet.add(limpiarSemana(r.SEMANA));
             });
 
@@ -412,7 +412,7 @@
             let permitidas = new Set();
             let fuenteFiltrada = [...dataF1, ...dataF2].filter(r => {
                 let matchA = aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO).trim());
-                let matchM = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES).trim().toUpperCase());
+                let matchM = mesesSeleccionados.size === 0 || Array.from(mesesSeleccionados, normalizarMes).includes(normalizarMes(r.MES));
                 return matchA && matchM;
             });
             fuenteFiltrada.forEach(r => {
@@ -447,80 +447,84 @@
         }
 
         function aplicarFiltros() {
-            const match = r => (aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO).trim())) &&
-                               (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES).trim().toUpperCase())) &&
-                               (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA)));
-
-            let f1F = dataF1.filter(match), f2F = dataF2.filter(match);
-            
-            if ((aniosSeleccionados.size > 0 || mesesSeleccionados.size > 0) && semanasSeleccionadas.size === 0) {
-                let permitidas = obtenerSemanasPermitidas();
-                f1F = dataF1.filter(r => {
-                    let matchA = aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO).trim());
-                    let matchM = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES).trim().toUpperCase());
-                    return matchA && matchM && permitidas.has(limpiarSemana(r.SEMANA));
-                });
-                f2F = dataF2.filter(r => {
-                    let matchA = aniosSeleccionados.size === 0 || aniosSeleccionados.has(String(r.AÑO).trim());
-                    let matchM = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES).trim().toUpperCase());
-                    return matchA && matchM && permitidas.has(limpiarSemana(r.SEMANA));
-                });
-            }
-
-            datosFiltradosF1 = f1F;
-            datosFiltradosF2 = f2F;
-            procesarDashboard(f1F, f2F);
-            generarHistoricoFacturaSemanal(f1F, f2F);
+            // Un filtro vacío significa "todos"; cualquier selección activa se aplica
+            // de la misma forma a ambas fuentes antes de calcular KPIs, tablas y gráficas.
+            const match = r => {
+                const anio = anioRegistro(r);
+                const mes = normalizarMes(r.MES ?? r.MES_NOMBRE ?? r.MES_NUMERO);
+                const semana = limpiarSemana(r.SEMANA);
+                const mesesFiltro = new Set(Array.from(mesesSeleccionados, normalizarMes));
+                return (aniosSeleccionados.size === 0 || aniosSeleccionados.has(anio)) &&
+                    (mesesSeleccionados.size === 0 || mesesFiltro.has(mes)) &&
+                    (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(semana));
+            };
+            datosFiltradosF1 = dataF1.filter(match);
+            datosFiltradosF2 = dataF2.filter(match);
+            procesarDashboard(datosFiltradosF1, datosFiltradosF2);
+            generarHistoricoFacturaSemanal(datosFiltradosF1, datosFiltradosF2);
         }
 
         function procesarDashboard(f1, f2) {
-            let totFact = 0, totVolMov = 0, totTrans = 0, totPed = 0, totRenta = 0, totOc = 0, totReal = 0, totRet = 0;
-            let semSet = new Set();
-
+            let totFact=0, totVolMov=0, totTrans=0, totPed=0, totRenta=0, totOc=0, totReal=0, totRet=0;
+            const semSet = new Set();
             f1.forEach(r => {
-                const tot = parseFloat(r.TOTAL || r.G || Object.values(r)[6] || 0) || 0;
-                const cat = clasificarConcepto(r.CONCEPTO);
-                totFact += tot;
-                if(cat === 'CARGO TRANSFERENCIA') totTrans += tot;
-                if(cat === 'PEDIDOS CHEP') totPed += tot;
-                if(cat === 'RENTA') totRenta += tot;
-                if(cat === 'CARGO CANAL' || /\bCARGO\s+CANAL\b/.test(String(r.CONCEPTO||'').toUpperCase())) {
-                    totVolMov += parseFloat(r.MOV || r.E || Object.values(r)[4] || 0) || 0;
-                }
-                if(r.SEMANA) semSet.add(limpiarSemana(r.SEMANA));
+                const total = totalF1(r), cat = clasificarConcepto(r.CONCEPTO);
+                totFact += total;
+                if (cat === 'CARGO TRANSFERENCIA') totTrans += total;
+                if (esPedidosChep(r)) totPed += total;
+                if (cat === 'RENTA') totRenta += total;
+                if (cat === 'CARGO CANAL') totVolMov += movF1(r);
+                if (r.SEMANA) semSet.add(clavePeriodo(r));
             });
-
             f2.forEach(r => {
-                totOc += r.OCUPAN; totReal += r.REAL; totRet += r.RETORNO;
-                if(r.SEMANA) semSet.add(limpiarSemana(r.SEMANA));
+                totOc += valorOcupados(r); totReal += numero(r.REAL); totRet += numero(r.RETORNO);
+                if (r.SEMANA) semSet.add(clavePeriodo(r));
             });
-
-            if(!f1.length && !f2.length || (!aniosSeleccionados.size && !mesesSeleccionados.size && !semanasSeleccionadas.size)) {
-                document.getElementById('kpiFacturacion').innerText = 'Sin selección';
-                document.getElementById('kpiVolumenCargo').innerText = 'Sin selección';
-                document.getElementById('kpiTransferencias').innerText = 'Sin selección';
-                document.getElementById('kpiPedidosChep').innerText = 'Sin selección';
-                document.getElementById('kpiRenta').innerText = 'Sin selección';
-                document.getElementById('kpiOcupanReal').innerText = 'Sin selección';
-                document.getElementById('kpiRetorno').innerText = 'Sin selección';
-                document.getElementById('kpiSemanasCount').innerText = 'Sin selección';
-            } else {
-                document.getElementById('kpiFacturacion').innerText = `$${totFact.toLocaleString('es-MX',{minimumFractionDigits:2})}`;
-                document.getElementById('kpiVolumenCargo').innerText = totVolMov.toLocaleString('es-MX');
-                document.getElementById('kpiTransferencias').innerText = `$${totTrans.toLocaleString('es-MX',{minimumFractionDigits:2})}`;
-                document.getElementById('kpiPedidosChep').innerText = `$${totPed.toLocaleString('es-MX',{minimumFractionDigits:2})}`;
-                document.getElementById('kpiRenta').innerText = `$${totRenta.toLocaleString('es-MX',{minimumFractionDigits:2})}`;
-                document.getElementById('kpiOcupanReal').innerText = `${totOc.toLocaleString()} / ${totReal.toLocaleString()}`;
-                document.getElementById('kpiRetorno').innerText = totRet.toLocaleString('es-MX');
-                document.getElementById('kpiSemanasCount').innerHTML = `<span class="text-xs font-extrabold text-cyan-400">${semSet.size} Semanas activas</span>`;
-            }
-
-            renderizarResumenHistorico(f1, f2);
-            renderChartFacturacion(f1, f2);
-            renderChartReqPlanta(f1, f2);
-            renderChartRetornoVsPedidos(f1, f2);
+            document.getElementById('kpiFacturacion').innerText = fmt(totFact,true);
+            document.getElementById('kpiVolumenCargo').innerText = fmt(totVolMov);
+            document.getElementById('kpiTransferencias').innerText = fmt(totTrans,true);
+            document.getElementById('kpiPedidosChep').innerText = fmt(totPed,true);
+            document.getElementById('kpiRenta').innerText = fmt(totRenta,true);
+            document.getElementById('kpiOcupanReal').innerText = `${fmt(totOc)} / ${fmt(totReal)}`;
+            document.getElementById('kpiRetorno').innerText = fmt(totRet);
+            document.getElementById('kpiSemanasCount').innerText = `${semSet.size} Semanas activas`;
+            renderizarResumenHistorico(f1,f2);
+            renderChartFacturacion(f1,f2);
+            renderChartReqPlanta(f1,f2);
+            renderChartRetornoVsPedidos(f1,f2);
             renderChartImpactoInflacionario(f1);
-            renderVariacionCosto();
+            renderVariacionCosto(f1);
+        }
+
+        function numero(v) {
+            if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+            if (v === null || v === undefined || v === '') return 0;
+            const limpio = String(v).replace(/[$,\s]/g, '').replace(/%/g, '');
+            const n = Number(limpio);
+            return Number.isFinite(n) ? n : 0;
+        }
+        function totalF1(r) { return numero(r.TOTAL ?? r.G ?? Object.values(r)[6]); }
+        function movF1(r) { return numero(r.MOV ?? r.E ?? Object.values(r)[4]); }
+        function costoUnitario(r) {
+            const keys = Object.keys(r || {});
+            return numero(r['C/U'] ?? r.CU ?? r.PRECIO ?? r.PRECIO_UNITARIO ?? r['P.U.'] ?? (keys.length >= 6 ? r[keys[5]] : 0));
+        }
+        function anioRegistro(r) { return String(r.AÑO ?? r.ANIO ?? '').trim(); }
+        function normalizarMes(valor) {
+            if (valor === null || valor === undefined || valor === '') return '';
+            const meses = ordenMeses;
+            const texto = String(valor).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const n = Number(texto);
+            if (Number.isInteger(n) && n >= 1 && n <= 12) return meses[n - 1];
+            const aliases = {ENE:'ENERO', JAN:'ENERO', FEB:'FEBRERO', MAR:'MARZO', ABR:'ABRIL', APR:'ABRIL', MAY:'MAYO', JUN:'JUNIO', JUL:'JULIO', AGO:'AGOSTO', AUG:'AGOSTO', SEP:'SEPTIEMBRE', SET:'SEPTIEMBRE', OCT:'OCTUBRE', NOV:'NOVIEMBRE', DIC:'DICIEMBRE', DEC:'DICIEMBRE'};
+            if (aliases[texto]) return aliases[texto];
+            return meses.find(m => m === texto || m.startsWith(texto)) || texto;
+        }
+        function esPedidosChep(r) { return String(r.CONCEPTO || '').trim().toUpperCase() === 'CUOTA ENTREGA DE PALLET ARRENDADO'; }
+        function valorOcupados(r) { return numero(r.OCUPAN_CUMPLIDOS ?? r.OCUPAN ?? r['OCUPAN CUMPLIDOS']); }
+        function clavePeriodo(r) { return `${anioRegistro(r)}_W${limpiarSemana(r.SEMANA)}`; }
+        function aniosDe(f1, f2) {
+            return Array.from(new Set([...f1, ...f2].map(anioRegistro).filter(Boolean))).sort((a,b) => Number(a)-Number(b));
         }
 
         function fmt(v, mon = false) {
@@ -530,286 +534,117 @@
 
         function renderizarResumenHistorico(f1, f2) {
             const tbody = document.getElementById('tablaResumenBody');
-            if(!aniosSeleccionados.size && !mesesSeleccionados.size && !semanasSeleccionadas.size) {
-                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">Selecciona filtros.</td></tr>';
-                return;
-            }
-
-            const matchPeriodo = r =>
-                (mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES || '').trim().toUpperCase())) &&
-                (semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA)));
-            const aniosBase = aniosSeleccionados.size
-                ? Array.from(aniosSeleccionados).map(String).sort((a,b) => Number(a)-Number(b))
-                : Array.from(new Set([...dataF1, ...dataF2].map(r => String(r.AÑO || '').trim()).filter(Boolean))).sort((a,b) => Number(a)-Number(b));
-            const anioAct = aniosBase[aniosBase.length - 1];
-            const anioAnt = anioAct ? String(Number(anioAct) - 1) : null;
-            f1 = dataF1.filter(r => matchPeriodo(r) && (!anioAct || String(r.AÑO || '').trim() === anioAct || String(r.AÑO || '').trim() === anioAnt));
-            f2 = dataF2.filter(r => matchPeriodo(r) && (!anioAct || String(r.AÑO || '').trim() === anioAct || String(r.AÑO || '').trim() === anioAnt));
-
-            let porAnio = {};
+            const anios = aniosDe(f1,f2);
+            const anioAct = anios[anios.length-1] || null;
+            const anioAnt = anios.length >= 2 ? anios[anios.length-2] : null;
+            const acum = {};
+            [...anios].forEach(a => acum[a]={fact:0,cargoMov:0,cargoDinero:0,trans:0,ped:0,renta:0,req:0,ret:0});
             f1.forEach(r => {
-                let a = String(r.AÑO||'').trim(); if(!a) return;
-                if(!porAnio[a]) porAnio[a] = { fact:0, cargoMov:0, cargoDinero:0, trans:0, ped:0, renta:0, req:0, ret:0 };
-                let tot = parseFloat(r.TOTAL || r.G || Object.values(r)[6] || 0) || 0;
-                let mov = parseFloat(r.MOV || r.E || Object.values(r)[4] || 0) || 0;
-                let cat = clasificarConcepto(r.CONCEPTO);
-                porAnio[a].fact += tot;
-                if(cat === 'CARGO CANAL' || /\bCARGO\s+CANAL\b/.test(String(r.CONCEPTO||'').toUpperCase())) {
-                    porAnio[a].cargoMov += mov;
-                    porAnio[a].cargoDinero += tot;
-                }
-                if(cat === 'CARGO TRANSFERENCIA') porAnio[a].trans += tot;
-                if(cat === 'PEDIDOS CHEP') porAnio[a].ped += tot;
-                if(cat === 'RENTA') porAnio[a].renta += tot;
+                const a=anioRegistro(r); if(!acum[a]) return;
+                const cat=clasificarConcepto(r.CONCEPTO), total=totalF1(r);
+                acum[a].fact += total;
+                if(cat==='CARGO CANAL'){acum[a].cargoMov += movF1(r); acum[a].cargoDinero += total;}
+                if(cat==='CARGO TRANSFERENCIA') acum[a].trans += total;
+                if(esPedidosChep(r)) acum[a].ped += total;
+                if(cat==='RENTA') acum[a].renta += total;
             });
-
-            f2.forEach(r => {
-                let a = String(r.AÑO||'').trim(); if(!a) return;
-                if(!porAnio[a]) porAnio[a] = { fact:0, cargoMov:0, cargoDinero:0, trans:0, ped:0, renta:0, req:0, ret:0 };
-                porAnio[a].req += parseFloat(r.REQ_PLANTA)||0;
-                porAnio[a].ret += parseFloat(r.RETORNO)||0;
-            });
-
-            const dAnt = porAnio[anioAnt] || { fact:0, cargoMov:0, cargoDinero:0, trans:0, ped:0, renta:0, req:0, ret:0 };
-            const dAct = porAnio[anioAct] || { fact:0, cargoMov:0, cargoDinero:0, trans:0, ped:0, renta:0, req:0, ret:0 };
-
-            document.getElementById('thResumenAnterior').innerText = `VALOR (${anioAnt || 'año anterior'})`;
-            document.getElementById('thResumenActual').innerText = `VALOR (${anioAct || 'año actual'})`;
-
-            const filas = [
-                { nombre: 'Facturación Total', vAnt: dAnt.fact, vAct: dAct.fact, mon: true },
-                { nombre: 'Volumen Cargo Canal (Suma de MOV - Fuente 1, Columna E)', vAnt: dAnt.cargoMov, vAct: dAct.cargoMov, mon: false },
-                { nombre: 'Volumen Cargo Canal ($ - Total - Fuente 1, Columna G)', vAnt: dAnt.cargoDinero, vAct: dAct.cargoDinero, mon: true },
-                { nombre: 'CARGO TRANSFERENCIA', vAnt: dAnt.trans, vAct: dAct.trans, mon: true },
-                { nombre: 'PEDIDOS CHEP', vAnt: dAnt.ped, vAct: dAct.ped, mon: true },
-                { nombre: 'RENTA', vAnt: dAnt.renta, vAct: dAct.renta, mon: true },
-                { nombre: 'REQ PLANTA', vAnt: dAnt.req, vAct: dAct.req, mon: false },
-                { nombre: 'RETORNO TARIMA', vAnt: dAnt.ret, vAct: dAct.ret, mon: false }
+            f2.forEach(r => {const a=anioRegistro(r); if(!acum[a]) return; acum[a].req += numero(r.REQ_PLANTA); acum[a].ret += numero(r.RETORNO);});
+            const vacio={fact:0,cargoMov:0,cargoDinero:0,trans:0,ped:0,renta:0,req:0,ret:0};
+            const ant=anioAnt ? acum[anioAnt] : vacio, act=anioAct ? acum[anioAct] : vacio;
+            document.getElementById('thResumenAnterior').innerText = anioAnt ? `VALOR (${anioAnt})` : 'VALOR (—)';
+            document.getElementById('thResumenActual').innerText = anioAct ? `VALOR (${anioAct})` : 'VALOR (—)';
+            const filas=[
+                {nombre:'Facturación Total',k:'fact',mon:true},
+                {nombre:'Volumen Cargo Canal (MOV)',k:'cargoMov'},
+                {nombre:'Volumen Cargo Canal ($)',k:'cargoDinero',mon:true},
+                {nombre:'CARGO TRANSFERENCIA',k:'trans',mon:true},
+                {nombre:'PEDIDOS CHEP (TOTAL - $)',k:'ped',mon:true},
+                {nombre:'RENTA',k:'renta',mon:true},
+                {nombre:'REQ PLANTA',k:'req'},
+                {nombre:'RETORNO TARIMA',k:'ret'}
             ];
-
-            tbody.innerHTML = filas.map(f => {
-                let diff = f.vAct - f.vAnt;
-                let varPct = f.vAnt ? ((diff / f.vAnt) * 100).toFixed(1) + '%' : '-';
-
-                return `
-                    <tr class="hover:bg-slate-50 border-b border-slate-100">
-                        <td class="p-2.5 font-bold text-slate-700">${f.nombre}</td>
-                        <td class="p-2.5 text-right text-slate-600">${fmt(f.vAnt, f.mon)}</td>
-                        <td class="p-2.5 text-right font-bold text-slate-800">${fmt(f.vAct, f.mon)}</td>
-                        <td class="p-2.5 text-right font-semibold ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${fmt(diff, f.mon)} (${varPct})</td>
-                    </tr>
-                `;
+            tbody.innerHTML=filas.map(x=>{
+                const va=anioAnt?ant[x.k]:null, vv=anioAct?act[x.k]:0, diff=anioAnt?vv-va:null;
+                const pct=anioAnt && va!==0 ? `${(diff/va*100).toFixed(1)}%` : '—';
+                return `<tr class="hover:bg-slate-50 border-b border-slate-100"><td class="p-2.5 font-bold text-slate-700">${x.nombre}</td><td class="p-2.5 text-right text-slate-600">${va===null?'—':fmt(va,x.mon)}</td><td class="p-2.5 text-right font-bold text-slate-800">${anioAct?fmt(vv,x.mon):'—'}</td><td class="p-2.5 text-right font-semibold ${diff===null?'text-slate-400':diff>=0?'text-emerald-600':'text-rose-600'}">${diff===null?'—':`${fmt(diff,x.mon)} (${pct})`}</td></tr>`;
             }).join('');
+        }
+
+        function semanasDelFiltro(f1, f2) {
+            // La lista de semanas sale de ambas fuentes ya filtradas, no solo de facturas.
+            // Así una semana válida en Fuente 2 no desaparece de la gráfica de facturación.
+            return Array.from(new Set([...f1, ...f2]
+                .map(r => Number(limpiarSemana(r.SEMANA)))
+                .filter(w => Number.isFinite(w) && w > 0)))
+                .sort((a,b) => a-b);
         }
 
         function renderChartFacturacion(f1, f2) {
             const ctx = document.getElementById('chartFacturacionAnual').getContext('2d');
             if (chartFacturaInstance) chartFacturaInstance.destroy();
-
-            const aniosActivos = aniosSeleccionados.size > 0 
-                ? Array.from(aniosSeleccionados).map(String).sort((a, b) => Number(a) - Number(b))
-                : Array.from(new Set(dataF1.map(r => String(r.AÑO || '').trim()).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
-
-            const anioActualSel = aniosActivos[aniosActivos.length - 1];
-            const anioAnteriorSel = aniosActivos.length >= 2 ? aniosActivos[aniosActivos.length - 2] : (anioActualSel ? String(Number(anioActualSel) - 1) : null);
-
-            let fuenteFactura = dataF1.filter(r => {
-                let a = String(r.AÑO || '').trim();
-                let matchAnio = (a === anioActualSel || a === anioAnteriorSel);
-                let matchMes = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES || '').trim().toUpperCase());
-                let matchSem = semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA));
-                return matchAnio && matchMes && matchSem;
+            const years = aniosSeleccionados.size ? Array.from(aniosSeleccionados).sort((a,b)=>Number(a)-Number(b)) : aniosDe(f1, f2);
+            const weekNums = semanasDelFiltro(f1, f2);
+            const labels = weekNums.map(w => `W${String(w).padStart(2, '0')}`);
+            const colors = ['#1e3a8a','#2563eb','#0891b2','#0f766e','#7c3aed','#64748b','#b45309'];
+            const datasets = years.map((year, i) => {
+                const weekly = {};
+                f1.forEach(r => {
+                    if (anioRegistro(r) !== String(year)) return;
+                    const week = `W${limpiarSemana(r.SEMANA)}`;
+                    weekly[week] = (weekly[week] || 0) + totalF1(r);
+                });
+                return {label: String(year), data: labels.map(label => weekly[label] || 0), backgroundColor: colors[i % colors.length], borderRadius: 3};
             });
-
-            let actMap = {}, antMap = {};
-            let sumAct = 0, sumAnt = 0;
-
-            fuenteFactura.forEach(r => {
-                let w = `W${limpiarSemana(r.SEMANA)}`;
-                let a = String(r.AÑO || '').trim();
-                let tot = parseFloat(r.TOTAL || r.G || Object.values(r)[6] || 0) || 0;
-                if (a === anioActualSel) {
-                    actMap[w] = (actMap[w] || 0) + tot;
-                    sumAct += tot;
-                } else if (a === anioAnteriorSel) {
-                    antMap[w] = (antMap[w] || 0) + tot;
-                    sumAnt += tot;
-                }
-            });
-
-            let labels = Array.from(new Set([...Object.keys(actMap), ...Object.keys(antMap)])).sort((a,b) => parseInt(a.replace('W','')) - parseInt(b.replace('W','')));
-
-            const subtext = document.getElementById('subtextFacturacion');
-            if (subtext) {
-                if (sumAnt > 0) {
-                    let diff = sumAct - sumAnt;
-                    let pct = ((diff / sumAnt) * 100).toFixed(1);
-                    let signo = diff >= 0 ? '+' : '';
-                    let colorClass = diff >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
-                    let textoEstado = diff >= 0 ? 'Aumento' : 'Disminución';
-                    subtext.innerHTML = `${textoEstado} de <span class="${colorClass}">${signo}${pct}%</span> en ${anioActualSel} vs ${anioAnteriorSel} ($${sumAct.toLocaleString('es-MX', {minimumFractionDigits: 2})} vs $${sumAnt.toLocaleString('es-MX', {minimumFractionDigits: 2})})`;
-                } else {
-                    subtext.innerText = `Mostrando facturación ${anioActualSel || ''} ($${sumAct.toLocaleString('es-MX', {minimumFractionDigits: 2})})`;
-                }
-            }
-
-            chartFacturaInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: `${anioAnteriorSel || 'Año Anterior'} ($)`,
-                            data: labels.map(l => antMap[l] || 0),
-                            backgroundColor: '#94a3b8',
-                            borderRadius: 4
-                        },
-                        {
-                            label: `${anioActualSel || 'Año Actual'} ($)`,
-                            data: labels.map(l => actMap[l] || 0),
-                            backgroundColor: '#3b82f6',
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'top' } }
-                }
-            });
+            const sub = document.getElementById('subtextFacturacion');
+            if (sub) sub.innerText = `Facturación · ${years.join(', ') || 'sin datos'} · ${labels.join(', ') || 'sin semanas'} · filtros aplicados`;
+            chartFacturaInstance = new Chart(ctx, {type:'bar', data:{labels, datasets}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw,true)}`}}}}});
         }
 
         function renderChartReqPlanta(f1, f2) {
             const ctx = document.getElementById('chartReqPlanta').getContext('2d');
             if (chartReqPlantaInstance) chartReqPlantaInstance.destroy();
-
-            const aniosActivos = aniosSeleccionados.size > 0 
-                ? Array.from(aniosSeleccionados).map(String).sort((a, b) => Number(a) - Number(b))
-                : Array.from(new Set(dataF2.map(r => String(r.AÑO || '').trim()).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
-
-            const anioActualSel = aniosActivos[aniosActivos.length - 1];
-            const anioAnteriorSel = aniosActivos.length >= 2 ? aniosActivos[aniosActivos.length - 2] : (anioActualSel ? String(Number(anioActualSel) - 1) : null);
-
-            let fuenteReq = dataF2.filter(r => {
-                let a = String(r.AÑO || '').trim();
-                let matchAnio = (a === anioActualSel || a === anioAnteriorSel);
-                let matchMes = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES || '').trim().toUpperCase());
-                let matchSem = semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA));
-                return matchAnio && matchMes && matchSem;
+            const years = aniosSeleccionados.size ? Array.from(aniosSeleccionados).sort((a,b)=>Number(a)-Number(b)) : aniosDe(f1, f2);
+            const weekNums = semanasDelFiltro(f1, f2);
+            const labels = weekNums.map(w => `W${String(w).padStart(2, '0')}`);
+            const colors = ['#1e3a8a','#2563eb','#0891b2','#0f766e','#7c3aed','#64748b','#b45309'];
+            const datasets = years.map((year, i) => {
+                const weekly = {};
+                f2.forEach(r => {
+                    if (anioRegistro(r) !== String(year)) return;
+                    const week = `W${limpiarSemana(r.SEMANA)}`;
+                    weekly[week] = (weekly[week] || 0) + numero(r.REQ_PLANTA);
+                });
+                return {label: String(year), data: labels.map(label => weekly[label] || 0), backgroundColor: colors[i % colors.length], borderRadius: 3};
             });
-
-            let actMap = {}, antMap = {};
-            let sumAct = 0, sumAnt = 0;
-
-            fuenteReq.forEach(r => {
-                let w = `W${limpiarSemana(r.SEMANA)}`;
-                let a = String(r.AÑO || '').trim();
-                let val = parseFloat(r.REQ_PLANTA) || 0;
-                if (a === anioActualSel) {
-                    actMap[w] = (actMap[w] || 0) + val;
-                    sumAct += val;
-                } else if (a === anioAnteriorSel) {
-                    antMap[w] = (antMap[w] || 0) + val;
-                    sumAnt += val;
-                }
-            });
-
-            let labels = Array.from(new Set([...Object.keys(actMap), ...Object.keys(antMap)])).sort((a,b) => parseInt(a.replace('W','')) - parseInt(b.replace('W','')));
-
-            const subtext = document.getElementById('subtextReqPlanta');
-            if (subtext) {
-                if (sumAnt > 0) {
-                    let diff = sumAct - sumAnt;
-                    let pct = ((diff / sumAnt) * 100).toFixed(1);
-                    let signo = diff >= 0 ? '+' : '';
-                    let colorClass = diff >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
-                    let textoEstado = diff >= 0 ? 'Aumento' : 'Disminución';
-                    subtext.innerHTML = `${textoEstado} de <span class="${colorClass}">${signo}${pct}%</span> en REQ Planta ${anioActualSel} vs ${anioAnteriorSel} (${sumAct.toLocaleString()} vs ${sumAnt.toLocaleString()})`;
-                } else {
-                    subtext.innerText = `Mostrando REQ Planta ${anioActualSel || ''} (${sumAct.toLocaleString()})`;
-                }
-            }
-
-            chartReqPlantaInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: `${anioAnteriorSel || 'Año Anterior'}`,
-                            data: labels.map(l => antMap[l] || 0),
-                            backgroundColor: '#94a3b8',
-                            borderRadius: 4
-                        },
-                        {
-                            label: `${anioActualSel || 'Año Actual'}`,
-                            data: labels.map(l => actMap[l] || 0),
-                            backgroundColor: '#0d9488',
-                            borderRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: true, position: 'top' } }
-                }
-            });
+            const sub = document.getElementById('subtextReqPlanta');
+            if (sub) sub.innerText = `REQ Planta · ${years.join(', ') || 'sin datos'} · ${labels.join(', ') || 'sin semanas'} · filtros aplicados`;
+            chartReqPlantaInstance = new Chart(ctx, {type:'bar', data:{labels, datasets}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}}}});
         }
 
         function renderChartRetornoVsPedidos(f1, f2) {
             const ctx = document.getElementById('chartRetornoVsPedidos').getContext('2d');
             if (chartRetornoVsPedidosInstance) chartRetornoVsPedidosInstance.destroy();
-
-            let pedMap = {}, retMap = {};
-            f1.forEach(r => {
-                if (clasificarConcepto(r.CONCEPTO) === 'PEDIDOS CHEP') {
-                    let w = `W${r.SEMANA}`;
-                    pedMap[w] = (pedMap[w] || 0) + (parseFloat(r.MOV) || 0);
-                }
+            // Fuente 2: F = CUMP. REALES (pedidos, ya en unidades); G = retorno bruto.
+            const periodos = new Set(f2.map(r => clavePeriodo(r)));
+            const labels = Array.from(periodos).sort((a, b) => {
+                const [ya, wa] = a.split('_W'), [yb, wb] = b.split('_W');
+                return Number(ya) - Number(yb) || Number(wa) - Number(wb);
             });
+            const retornoBruto = {}, pedidos = {};
             f2.forEach(r => {
-                let w = `W${r.SEMANA}`;
-                retMap[w] = (retMap[w] || 0) + (parseFloat(r.RETORNO) || 0);
+                const key = clavePeriodo(r);
+                retornoBruto[key] = (retornoBruto[key] || 0) + numero(r.RETORNO); // Columna G
+                pedidos[key] = (pedidos[key] || 0) + numero(r.REAL);              // Columna F
             });
-
-            let labels = Array.from(new Set([...Object.keys(pedMap), ...Object.keys(retMap)])).sort((a,b) => parseInt(a.replace('W','')) - parseInt(b.replace('W','')));
-
+            const retornoUnidades = labels.map(k => Math.round((retornoBruto[k] || 0) / 504));
+            const pedidosUnidades = labels.map(k => pedidos[k] || 0);
             chartRetornoVsPedidosInstance = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Pedidos CHEP (/504)',
-                            data: labels.map(l => ((pedMap[l]||0)/504).toFixed(1)),
-                            borderColor: '#0284c7',
-                            backgroundColor: 'rgba(2, 132, 199, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        },
-                        {
-                            label: 'Retorno Tarima (/504)',
-                            data: labels.map(l => ((retMap[l]||0)/504).toFixed(1)),
-                            borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            fill: true,
-                            tension: 0.3,
-                            pointRadius: 4,
-                            pointHoverRadius: 6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    }
-                }
+                data: {labels: labels.map(k => k.replace('_', ' ')), datasets: [
+                    {label:'Retornos (Fuente 2: G ÷ 504, redondeado)', data:retornoUnidades, borderColor:'#0284c7', backgroundColor:'rgba(2,132,199,.1)', fill:true, tension:.3},
+                    {label:'Pedidos / CUMP. REALES (Fuente 2: F)', data:pedidosUnidades, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.1)', fill:true, tension:.3}
+                ]},
+                options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true,position:'top'}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}`}}}}
             });
         }
 
@@ -898,220 +733,139 @@
             });
         }
 
-        function renderVariacionCosto() {
-            const tbody = document.getElementById('tablaVariacionCostoBody');
-            const ctx = document.getElementById('chartVariacionCosto').getContext('2d');
-            if (chartVariacionCostoInstance) chartVariacionCostoInstance.destroy();
+        function renderVariacionCosto(f1=datosFiltradosF1) {
+            const tbody=document.getElementById('tablaVariacionCostoBody'), ctx=document.getElementById('chartVariacionCosto').getContext('2d');
+            if(chartVariacionCostoInstance) chartVariacionCostoInstance.destroy();
+            const years=aniosDe(f1,[]), prev=years.length>=2?years[years.length-2]:null, current=years[years.length-1]||null;
+            if(!f1.length || !current){tbody.innerHTML='<tr><td colspan="8" class="p-4 text-center text-slate-400">No hay datos para los filtros seleccionados.</td></tr>';return;}
+            const groups={};
+            f1.forEach(r=>{const year=anioRegistro(r); if(year!==current && year!==prev) return; const concept=String(r.CONCEPTO||'SIN CONCEPTO').trim().toUpperCase(); const k=`${concept}_W${limpiarSemana(r.SEMANA)}`; if(!groups[k]) groups[k]={concept,sem:limpiarSemana(r.SEMANA),now:[],before:[]}; const v=costoUnitario(r); if(year===current)groups[k].now.push(v); else if(year===prev)groups[k].before.push(v);});
+            const rows=Object.values(groups).map(g=>({ ...g, puAct:g.now.length?g.now.reduce((a,b)=>a+b,0)/g.now.length:null, puAnt:g.before.length?g.before.reduce((a,b)=>a+b,0)/g.before.length:null })).sort((a,b)=>Number(a.sem)-Number(b.sem)||a.concept.localeCompare(b.concept));
+            tbody.innerHTML=rows.map(x=>{const diff=x.puAct!==null&&x.puAnt!==null?x.puAct-x.puAnt:null;const pct=diff!==null&&x.puAnt!==0?`${(diff/x.puAnt*100).toFixed(1)}%`:'—';const color=diff===null?'text-slate-400':diff>0?'text-rose-600':diff<0?'text-emerald-600':'text-slate-600';return `<tr class="hover:bg-slate-50 border-b border-slate-100 text-xs"><td class="p-2.5 font-bold text-slate-700">${x.concept}</td><td class="p-2.5">W${x.sem}</td><td class="p-2.5 text-slate-500">${prev||'—'}</td><td class="p-2.5 text-right">${x.puAnt===null?'—':fmt(x.puAnt,true)}</td><td class="p-2.5 font-bold">${current}</td><td class="p-2.5 text-right font-bold">${x.puAct===null?'—':fmt(x.puAct,true)}</td><td class="p-2.5 text-right font-bold ${color}">${diff===null?'—':fmt(diff,true)}</td><td class="p-2.5 text-right font-bold ${color}">${pct}</td></tr>`;}).join('');
+            chartVariacionCostoInstance=new Chart(ctx,{type:'line',data:{labels:rows.map(x=>`${x.concept} W${x.sem}`),datasets:[{label:`Costo unitario ${prev||'año previo'} ($)`,data:rows.map(x=>x.puAnt),borderColor:'#94a3b8',borderDash:[5,5],tension:.2},{label:`Costo unitario ${current} ($)`,data:rows.map(x=>x.puAct),borderColor:'#1e3a8a',tension:.2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top'}}}});
+        }
 
-            if (!datosFiltradosF1.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-400">Selecciona filtros para visualizar las variaciones de costo.</td></tr>';
-                return;
+        function fechaLunesISO(anio, semana) {
+            // Devuelve el lunes de una semana ISO; permite asociar semanas futuras
+            // al mes correcto aunque todavía no existan filas en los archivos.
+            const d = new Date(Date.UTC(Number(anio), 0, 4));
+            const dia = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() - dia + 1 + (Number(semana) - 1) * 7);
+            return d;
+        }
+
+        function semanasISOdelMes(anio, mesNombre) {
+            const mes = ordenMeses.indexOf(String(mesNombre).toUpperCase());
+            if (mes < 0) return [];
+            const semanas = [];
+            // Semana de operación asignada por el mes en que inicia (lunes).
+            for (let w = 1; w <= 53; w++) {
+                const lunes = fechaLunesISO(anio, w);
+                if (lunes.getUTCFullYear() === Number(anio) && lunes.getUTCMonth() === mes) semanas.push(w);
             }
-
-            const aniosActivos = aniosSeleccionados.size > 0 
-                ? Array.from(aniosSeleccionados).map(String).sort((a, b) => Number(a) - Number(b))
-                : Array.from(new Set(dataF1.map(r => String(r.AÑO || '').trim()).filter(Boolean))).sort((a, b) => Number(a) - Number(b));
-
-            const anioActualSel = aniosActivos[aniosActivos.length - 1];
-            const anioAnteriorSel = aniosActivos.length >= 2 ? aniosActivos[aniosActivos.length - 2] : (anioActualSel ? String(Number(anioActualSel) - 1) : null);
-
-            let compMap = {};
-            let fuenteVariacion = dataF1.filter(r => {
-                let a = String(r.AÑO || '').trim();
-                let matchAnio = (a === anioActualSel || a === anioAnteriorSel);
-                let matchMes = mesesSeleccionados.size === 0 || mesesSeleccionados.has(String(r.MES || '').trim().toUpperCase());
-                let matchSem = semanasSeleccionadas.size === 0 || semanasSeleccionadas.has(limpiarSemana(r.SEMANA));
-                return matchAnio && matchMes && matchSem;
-            });
-
-            fuenteVariacion.forEach(r => {
-                let conceptName = String(r.CONCEPTO || 'SIN CONCEPTO').trim().toUpperCase();
-                let sem = limpiarSemana(r.SEMANA);
-                let a = String(r.AÑO || '').trim();
-                let keysObj = Object.keys(r);
-                let pu = parseFloat(r['C/U'] || r['PRECIO'] || r['PRECIO_UNITARIO'] || r['P.U.'] || (keysObj.length >= 6 ? r[keysObj[5]] : 0) || 0);
-
-                let key = `${conceptName}_W${sem}`;
-                if (!compMap[key]) {
-                    compMap[key] = { concept: conceptName, sem, actVals: [], antVals: [] };
-                }
-                if (a === anioActualSel) {
-                    compMap[key].actVals.push(pu);
-                } else if (a === anioAnteriorSel) {
-                    compMap[key].antVals.push(pu);
-                }
-            });
-
-            let list = [];
-            Object.keys(compMap).forEach(key => {
-                let item = compMap[key];
-                if (item.actVals.length > 0 || item.antVals.length > 0) {
-                    let puAct = item.actVals.length ? item.actVals.reduce((a, b) => a + b, 0) / item.actVals.length : 0;
-                    let puAnt = item.antVals.length ? item.antVals.reduce((a, b) => a + b, 0) / item.antVals.length : 0;
-                    list.push({
-                        concept: item.concept,
-                        sem: item.sem,
-                        aAct: anioActualSel || 'Actual',
-                        aAnt: anioAnteriorSel || 'Anterior',
-                        puAct,
-                        puAnt
-                    });
-                }
-            });
-
-            list.sort((a, b) => parseInt(a.sem) - parseInt(b.sem));
-
-            if (!list.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-slate-400">No hay datos suficientes para comparar entre el año anterior y actual seleccionados.</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = list.map(item => {
-                let diff = item.puAct - item.puAnt;
-                let varPctStr = '-';
-                if (item.puAnt > 0) {
-                    let pct = ((diff / item.puAnt) * 100).toFixed(1);
-                    varPctStr = `${diff >= 0 ? '+' : ''}${pct}%`;
-                } else if (item.puAct > 0) {
-                    varPctStr = '+100%';
-                }
-
-                let diffColor = diff > 0 ? 'text-rose-600' : (diff < 0 ? 'text-emerald-600' : 'text-slate-600');
-                let diffSign = diff > 0 ? '+$' : (diff < 0 ? '-$' : '$');
-
-                return `
-                    <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs">
-                        <td class="p-2.5 font-bold text-slate-700">${item.concept}</td>
-                        <td class="p-2.5">W${item.sem}</td>
-                        <td class="p-2.5 text-slate-500">${item.aAnt}</td>
-                        <td class="p-2.5 text-right font-medium">$${item.puAnt.toFixed(2)}</td>
-                        <td class="p-2.5 font-bold text-slate-800">${item.aAct}</td>
-                        <td class="p-2.5 text-right font-bold text-slate-800">$${item.puAct.toFixed(2)}</td>
-                        <td class="p-2.5 text-right font-bold ${diffColor}">${diffSign}${Math.abs(diff).toFixed(2)}</td>
-                        <td class="p-2.5 text-right font-bold ${diffColor}">${varPctStr}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            chartVariacionCostoInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: list.map(i => `${i.concept} W${i.sem}`),
-                    datasets: [
-                        {
-                            label: `Costo Unitario (${anioAnteriorSel || 'Anterior'}) ($)`,
-                            data: list.map(i => i.puAnt),
-                            borderColor: '#94a3b8',
-                            backgroundColor: 'rgba(148, 163, 184, 0.1)',
-                            borderDash: [5, 5],
-                            tension: 0.2
-                        },
-                        {
-                            label: `Costo Unitario (${anioActualSel || 'Actual'}) ($)`,
-                            data: list.map(i => i.puAct),
-                            borderColor: '#6366f1',
-                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                            tension: 0.2
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top' }
-                    }
-                }
-            });
+            return semanas;
         }
 
         function generarHistoricoFacturaSemanal(f1, f2) {
             const tbody = document.getElementById('tablaHistoricoFacturaBody');
-            let semIndex = {};
-
+            const map = {};
+            const ensure = (r) => {
+                const key = clavePeriodo(r);
+                if (!map[key]) map[key] = {a:anioRegistro(r), m:String(r.MES || '').trim().toUpperCase(), w:limpiarSemana(r.SEMANA), tot:0, cargoDinero:0, trans:0, ped:0, renta:0, req:0, ret:0, hasData:true, hasFactura:false};
+                return map[key];
+            };
             f1.forEach(r => {
-                let key = `${r.AÑO}_${String(r.MES||'').trim().toUpperCase()}_${limpiarSemana(r.SEMANA)}`;
-                if (!semIndex[key]) {
-                    semIndex[key] = { a: String(r.AÑO), m: String(r.MES||'').trim().toUpperCase(), w: limpiarSemana(r.SEMANA), tot: 0, cargoDinero: 0, trans: 0, ped: 0, renta: 0, req: 0, ret: 0, hasData: true };
-                }
-                let tot = parseFloat(r.TOTAL || r.G || Object.values(r)[6] || 0) || 0;
-                let cat = clasificarConcepto(r.CONCEPTO);
-                semIndex[key].tot += tot;
-                if (cat === 'CARGO CANAL' || /\bCARGO\s+CANAL\b/.test(String(r.CONCEPTO||'').toUpperCase())) {
-                    semIndex[key].cargoDinero += tot;
-                }
-                if (cat === 'CARGO TRANSFERENCIA') semIndex[key].trans += tot;
-                if (cat === 'PEDIDOS CHEP') semIndex[key].ped += tot;
-                if (cat === 'RENTA') semIndex[key].renta += tot;
+                const x = ensure(r), total = totalF1(r), cat = clasificarConcepto(r.CONCEPTO);
+                x.hasFactura = true; x.tot += total;
+                if (cat === 'CARGO CANAL') x.cargoDinero += total;
+                if (cat === 'CARGO TRANSFERENCIA') x.trans += total;
+                if (esPedidosChep(r)) x.ped += total;
+                if (cat === 'RENTA') x.renta += total;
             });
+            f2.forEach(r => { const x = ensure(r); x.req += numero(r.REQ_PLANTA); x.ret += numero(r.RETORNO); });
 
-            f2.forEach(r => {
-                let key = `${r.AÑO}_${String(r.MES||'').trim().toUpperCase()}_${limpiarSemana(r.SEMANA)}`;
-                if (!semIndex[key]) {
-                    semIndex[key] = { a: String(r.AÑO), m: String(r.MES||'').trim().toUpperCase(), w: limpiarSemana(r.SEMANA), tot: 0, cargoDinero: 0, trans: 0, ped: 0, renta: 0, req: 0, ret: 0, hasData: true };
-                }
-                semIndex[key].req += parseFloat(r.REQ_PLANTA) || 0;
-                semIndex[key].ret += parseFloat(r.RETORNO) || 0;
-            });
-
-            aniosSeleccionados.forEach(anio => {
-                semanasSeleccionadas.forEach(sem => {
-                    let mesEstimado = mesesSeleccionados.size > 0 ? Array.from(mesesSeleccionados)[0] : 'GENERAL';
-                    let key = `${anio}_${mesEstimado}_${sem}`;
-                    if (!semIndex[key]) {
-                        semIndex[key] = { a: String(anio), m: mesEstimado, w: sem, tot: 0, cargoDinero: 0, trans: 0, ped: 0, renta: 0, req: 0, ret: 0, hasData: false };
-                    }
-                });
-            });
-
-            let arr = Object.values(semIndex).sort((x,y) => x.a !== y.a ? x.a - y.a : parseInt(x.w) - parseInt(y.w));
-            if (!arr.length) {
-                tbody.innerHTML = '<tr><td colspan="12" class="p-4 text-center text-slate-400">Selecciona filtros para visualizar el histórico de factura semanal.</td></tr>';
+            const actual = Object.values(map).sort((a,b) => Number(a.a)-Number(b.a) || Number(a.w)-Number(b.w));
+            if (!actual.length && !dataF1.length) {
+                tbody.innerHTML = '<tr><td colspan="12" class="p-4 text-center text-slate-400">No hay datos para los filtros seleccionados.</td></tr>';
                 return;
             }
 
-            let puntosHistoricos = arr.filter(r => r.hasData && r.tot > 0).map((r, index) => ({ x: index + 1, y: r.tot }));
-            let m = 0, b = 0;
-            if (puntosHistoricos.length >= 2) {
-                let n = puntosHistoricos.length;
-                let sumX = puntosHistoricos.reduce((acc, p) => acc + p.x, 0);
-                let sumY = puntosHistoricos.reduce((acc, p) => acc + p.y, 0);
-                let sumXY = puntosHistoricos.reduce((acc, p) => acc + (p.x * p.y), 0);
-                let sumXX = puntosHistoricos.reduce((acc, p) => acc + (p.x * p.x), 0);
-                let denominador = (n * sumXX - sumX * sumX);
-                if (denominador !== 0) {
-                    m = (n * sumXY - sumX * sumY) / denominador;
-                    b = (sumY - m * sumX) / n;
-                }
-            } else if (puntosHistoricos.length === 1) {
-                b = puntosHistoricos[0].y;
+            const selectedYears = aniosSeleccionados.size ? Array.from(aniosSeleccionados) : aniosDe(dataF1, dataF2);
+            const targetYear = selectedYears.length === 1 ? String(selectedYears[0]) : String(selectedYears.sort((a,b)=>Number(a)-Number(b)).slice(-1)[0] || new Date().getFullYear());
+            const months = mesesSeleccionados.size && mesesSeleccionados.size < mesesDisponibles.length
+                ? Array.from(mesesSeleccionados)
+                : [];
+            const allYearF1 = dataF1.filter(r => anioRegistro(r) === targetYear);
+
+            // Historial para la regresión: las últimas seis semanas con facturación
+            // real del mismo año, anteriores a la primera semana que se proyectará.
+            const invoiceByWeek = {};
+            allYearF1.forEach(r => {
+                const w = Number(limpiarSemana(r.SEMANA));
+                if (Number.isFinite(w)) invoiceByWeek[w] = (invoiceByWeek[w] || 0) + totalF1(r);
+            });
+
+            const currentDate = new Date();
+            const currentISOWeek = (() => {
+                const d = new Date(Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()));
+                const day = d.getUTCDay() || 7; d.setUTCDate(d.getUTCDate() + 4 - day);
+                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            })();
+            const forecastWeeks = new Set();
+
+            if (months.length) {
+                // Si se elige noviembre 2026 estando en noviembre, proyectar desde
+                // la semana actual hasta el cierre del mes: W46-W49. No incluir W50+.
+                months.forEach(month => {
+                    const monthWeeks = semanasISOdelMes(targetYear, month);
+                    const isCurrentMonth = Number(targetYear) === currentDate.getFullYear() && ordenMeses.indexOf(month) === currentDate.getMonth();
+                    const start = isCurrentMonth ? currentISOWeek : (monthWeeks[0] || 1);
+                    monthWeeks.filter(w => w >= start).forEach(w => forecastWeeks.add(w));
+                });
+            } else {
+                // Sin un mes específico, conservar el horizonte móvil de cuatro semanas.
+                const availableWeeks = Object.keys(invoiceByWeek).map(Number).filter(Number.isFinite);
+                const anchor = availableWeeks.length ? Math.max(...availableWeeks) : currentISOWeek;
+                for (let i=1; i<=4; i++) if (anchor+i <= 53) forecastWeeks.add(anchor+i);
             }
 
-            tbody.innerHTML = arr.map((row, idx) => {
-                let prevTot = idx > 0 ? arr[idx-1].tot : 0;
-                let varPct = (prevTot > 0 && row.hasData) ? (((row.tot - prevTot)/prevTot)*100).toFixed(1) : '0.0';
-                
-                let xVal = idx + 1;
-                let proyeccionRegresion = (m !== 0 || b !== 0) ? (m * xVal + b) : row.tot;
-                if (proyeccionRegresion < 0) proyeccionRegresion = 0;
-                let valorCeldaProyeccion = row.hasData && row.tot > 0 ? row.tot : proyeccionRegresion;
+            const firstForecastWeek = forecastWeeks.size ? Math.min(...forecastWeeks) : null;
+            const historyWeeks = Object.keys(invoiceByWeek).map(Number)
+                .filter(w => Number.isFinite(w) && (firstForecastWeek === null || w < firstForecastWeek))
+                .sort((a,b)=>a-b).slice(-6);
+            const history = historyWeeks.map(w => ({week:w, total:invoiceByWeek[w]}));
 
-                return `
-                    <tr class="hover:bg-slate-50 border-b border-slate-100 text-xs ${!row.hasData ? 'bg-blue-50/40 italic' : ''}">
-                        <td class="p-2.5 font-bold">${row.a}</td>
-                        <td class="p-2.5">${row.m}</td>
-                        <td class="p-2.5 font-semibold">W${row.w} ${!row.hasData ? '(Proyectada)' : ''}</td>
-                        <td class="p-2.5 text-right font-bold text-slate-800">${row.hasData ? '$' + row.tot.toLocaleString('es-MX',{minimumFractionDigits:2}) : '-'}</td>
-                        <td class="p-2.5 text-right font-bold text-blue-600">$${valorCeldaProyeccion.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-                        <td class="p-2.5 text-right font-bold ${varPct >= 0 ? 'text-emerald-600' : 'text-rose-600'}">${varPct}%</td>
-                        <td class="p-2.5 text-right">$${row.cargoDinero.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-                        <td class="p-2.5 text-right">$${row.trans.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-                        <td class="p-2.5 text-right">$${row.ped.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-                        <td class="p-2.5 text-right">$${row.renta.toLocaleString('es-MX',{minimumFractionDigits:2})}</td>
-                        <td class="p-2.5 text-right">${row.req.toLocaleString()}</td>
-                        <td class="p-2.5 text-right font-semibold text-emerald-700">${row.ret.toLocaleString()}</td>
-                    </tr>
-                `;
+            let slope = 0, intercept = 0;
+            if (history.length >= 2) {
+                const xs = history.map(r=>r.week), ys = history.map(r=>r.total), n=xs.length;
+                const sx=xs.reduce((a,b)=>a+b,0), sy=ys.reduce((a,b)=>a+b,0);
+                const sxy=xs.reduce((a,x,i)=>a+x*ys[i],0), sxx=xs.reduce((a,x)=>a+x*x,0), den=n*sxx-sx*sx;
+                if (den) { slope=(n*sxy-sx*sy)/den; intercept=(sy-slope*sx)/n; }
+            } else if (history.length === 1) intercept = history[0].total;
+            const fallback = history.length ? history.reduce((a,r)=>a+r.total,0)/history.length : 0;
+
+            const projected = [];
+            forecastWeeks.forEach(week => {
+                const key = `${targetYear}_W${String(week).padStart(2,'0')}`;
+                // Si ya existe una factura real para esa semana, no duplicar como proyección.
+                if (map[key] && map[key].hasFactura) return;
+                const forecast = history.length >= 2 ? Math.max(0, slope*week+intercept) : fallback;
+                const monday = fechaLunesISO(targetYear, week);
+                const monthLabel = ordenMeses[monday.getUTCMonth()];
+                projected.push({a:String(targetYear),m:monthLabel,w:String(week).padStart(2,'0'),tot:0,cargoDinero:0,trans:0,ped:0,renta:0,req:0,ret:0,hasData:false,hasFactura:false,projection:Number.isFinite(forecast)?forecast:0});
+            });
+
+            // Con mes seleccionado, la tabla muestra solo semanas del mes filtrado
+            // y sus proyecciones; así W50-W52 (diciembre) no aparecen en noviembre.
+            let actualRows = actual;
+            if (months.length) actualRows = actual.filter(r => months.includes(String(r.m).toUpperCase()));
+            const finalRows = [...actualRows, ...projected].sort((a,b)=>Number(a.a)-Number(b.a)||Number(a.w)-Number(b.w));
+            tbody.innerHTML = finalRows.map((r, i) => {
+                const previous = i ? (finalRows[i-1].hasData ? finalRows[i-1].tot : finalRows[i-1].projection) : 0;
+                const shown = r.hasData ? r.tot : r.projection;
+                const pct = previous > 0 && r.hasData ? ((r.tot-previous)/previous*100).toFixed(1) : '—';
+                return `<tr class="hover:bg-slate-50 border-b border-slate-100 text-xs ${!r.hasData?'bg-blue-50/40 italic':''}"><td class="p-2.5 font-bold">${r.a}</td><td class="p-2.5">${r.m}</td><td class="p-2.5 font-semibold">W${r.w}${!r.hasData?' (Proyectada)':''}</td><td class="p-2.5 text-right font-bold">${r.hasFactura?fmt(r.tot,true):'—'}</td><td class="p-2.5 text-right font-bold text-blue-600">${fmt(shown,true)}</td><td class="p-2.5 text-right">${pct==='—'?'—':pct+'%'}</td><td class="p-2.5 text-right">${fmt(r.cargoDinero,true)}</td><td class="p-2.5 text-right">${fmt(r.trans,true)}</td><td class="p-2.5 text-right">${fmt(r.ped,true)}</td><td class="p-2.5 text-right">${fmt(r.renta,true)}</td><td class="p-2.5 text-right">${fmt(r.req)}</td><td class="p-2.5 text-right font-semibold text-emerald-700">${fmt(r.ret)}</td></tr>`;
             }).join('');
         }
 
